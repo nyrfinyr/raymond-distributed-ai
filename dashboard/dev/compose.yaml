@@ -1,0 +1,9 @@
+services:
+
+  broker:
+    image: nats:alpine
+    container_name: nats-dev-broker
+    command: "-js -m 8222"
+    ports:
+      - "4222:4222"
+      - "8222:8222"

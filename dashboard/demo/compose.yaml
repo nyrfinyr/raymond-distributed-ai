@@ -1,0 +1,50 @@
+services:
+  # 1. Broker (NATS) for Dashboard update
+  broker:
+    image: nats:alpine
+    networks:
+      - swarm-net
+    command: "-js -m 8222"
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  # 2. Dashboard
+  dashboard:
+    image: mydashboard:latest
+    ports:
+      - "8080:80"
+    environment:
+      - BROKER_URL=nats://broker:4222
+    networks:
+      - swarm-net
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+
+  node-worker:
+    image: mynode:latest
+    environment:
+      - BROKER_URL=nats://broker:4222
+      - NODE_ID={{.Task.Slot}}
+    networks:
+      - swarm-net
+    deploy:
+      replicas: 3
+      update_config:
+        parallelism: 2
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+
+networks:
+  swarm-net:
+    driver: overlay

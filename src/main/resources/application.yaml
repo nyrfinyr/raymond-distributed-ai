@@ -1,5 +1,0 @@
-spring:
-  application:
-    name: distributed-ai
-vaadin:
-  launch-browser: true
