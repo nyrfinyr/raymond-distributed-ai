@@ -2,8 +2,6 @@ import { Network } from "vis-network/peer/esm/vis-network";
 import { DataSet } from "vis-data/peer/esm/vis-data";
 
 window.initNetworkGraph = (element) => {
-    // 1. Inizializzazione DataSet vuoti
-    // I nodi e gli archi li aggiungeremo da Java subito dopo l'init
     const nodes = new DataSet([]);
     const edges = new DataSet([]);
 
@@ -19,7 +17,7 @@ window.initNetworkGraph = (element) => {
         edges: {
             width: 2,
             color: { color: '#848484', highlight: '#848484'},
-            arrows: 'to', // FONDAMENTALE: Mostra la direzione dell'holder
+            arrows: 'to',
             smooth: { type: 'continuous' }
         },
         physics: {
@@ -33,29 +31,72 @@ window.initNetworkGraph = (element) => {
     // 3. Creazione del Network dentro il <div> (element) passato da Java
     const network = new Network(element, { nodes, edges }, options);
 
-    // --- FUNZIONI ESPOSTE A JAVA ---
-    // Le attacchiamo direttamente all'elemento DOM gestito da Vaadin
+    // Helper per convertire il DTO Java (nested) nel formato piatto di Vis.js
+    // Java NodeData: { nodeId: { nodeId: "1" }, label: "A" } -> Vis: { id: "1", label: "A" }
+    const mapNode = (rawNode) => {
+        return {
+            ...rawNode,
+            id: rawNode.nodeId.nodeId, // Mappa nodeId.nodeId -> id
+            label: rawNode.label
+        };
+    };
 
-    // A. Caricamento iniziale o reset totale
+    // Helper per gli Edge
+    // Java EdgeData: { from: { nodeId: "1" }, to: { nodeId: "2" } } -> Vis: { from: "1", to: "2" }
+    const mapEdge = (rawEdge) => {
+        return {
+            ...rawEdge,
+            from: rawEdge.from.nodeId, // Estrai la stringa dall'oggetto
+            to: rawEdge.to.nodeId      // Estrai la stringa dall'oggetto
+        };
+    };
+
     element.setGraphData = (nodesJson, edgesJson) => {
         nodes.clear();
         edges.clear();
-        nodes.add(JSON.parse(nodesJson));
-        edges.add(JSON.parse(edgesJson));
-        network.fit(); // Centra il grafo
+
+        const rawNodes = JSON.parse(nodesJson);
+        const rawEdges = JSON.parse(edgesJson);
+
+        nodes.add(rawNodes.map(mapNode));
+        edges.add(rawEdges.map(mapEdge));
+
+        network.fit();
     };
 
-    // B. Aggiorna stato/colore nodo (Idle, Requesting, Critical)
+    element.addNode = (nodeJson) => {
+        const rawNode = JSON.parse(nodeJson);
+        nodes.add(mapNode(rawNode));
+        network.fit();
+    }
+
+    element.addEdge = (edgeJson) => {
+        const rawEdge = JSON.parse(edgeJson);
+        const newEdge = mapEdge(rawEdge);
+
+        const existingEdges = edges.get({
+            filter: function (item) {
+                return (item.from === newEdge.from && item.to === newEdge.to) ||
+                    (item.from === newEdge.to && item.to === newEdge.from);
+            }
+        });
+
+        if (existingEdges.length > 0) {
+            const idsToRemove = existingEdges.map(edge => edge.id);
+            edges.remove(idsToRemove);
+        }
+
+        edges.add(newEdge);
+        network.fit();
+    }
+
     element.updateNodeColor = (nodeId, colorCode) => {
         try {
             nodes.update({ id: nodeId, color: { background: colorCode } });
         } catch (e) { console.error("Errore update nodo", e); }
     };
 
-    // C. Inverte la direzione dell'arco (Raymond logic)
-    // "from" ora punta a "to" come suo holder.
     element.updateEdgeDirection = (fromId, toId) => {
-        // Rimuovi arco esistente tra i due (indipendentemente dalla direzione)
         const items = edges.get({
             filter: function (item) {
                 return (item.from === fromId && item.to === toId) ||
@@ -65,12 +106,10 @@ window.initNetworkGraph = (element) => {
 
         if (items.length > 0) {
             edges.remove(items[0].id);
-            // Aggiungi nuovo arco orientato correttamente
             edges.add({ from: fromId, to: toId });
         }
     };
 
-    // D. Centra la vista per includere tutti i nodi
     element.fitGraph = () => {
         network.fit({
             animation: {

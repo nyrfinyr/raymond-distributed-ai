@@ -28,6 +28,7 @@ dependencies {
     implementation 'com.vaadin:vaadin-spring-boot-starter'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     developmentOnly 'com.vaadin:vaadin-dev'
+    implementation 'io.nats:jnats:2.16.14'
 }
 
 dependencyManagement {

@@ -1,10 +1,11 @@
-package it.alesvale.dashboard;
+package it.alesvale.dashboard.frontendlib;
 
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.HasSize;
 import com.vaadin.flow.component.Tag;
 import com.vaadin.flow.component.dependency.JsModule;
 import com.vaadin.flow.component.dependency.NpmPackage;
+import it.alesvale.dashboard.dto.Dto;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
@@ -24,19 +25,46 @@ public class NetworkGraph extends Component implements HasSize {
     }
 
     /**
-     * Carica la topologia iniziale.
+     * Load graph topology
      */
-    public void setTopology(List<NodeData> nodes, List<EdgeData> edges) {
+    public void setTopology(List<Dto.NodeData> nodes, List<Dto.EdgeData> edges) {
         try {
             String nodesJson = mapper.writeValueAsString(nodes);
             String edgesJson = mapper.writeValueAsString(edges);
             getElement().executeJs("this.setGraphData($0, $1)", nodesJson, edgesJson);
         } catch (Exception e) {
-            e.printStackTrace();
+            throw new RuntimeException(e);
         }
     }
 
-    public void updateNodeStatus(String nodeId, NodeStatus status) {
+    /**
+     * Add Node to existing graph
+     */
+    public void addNode(Dto.NodeData node) {
+        try {
+            String nodeJson = mapper.writeValueAsString(node);
+            getElement().executeJs("this.addNode($0)", nodeJson);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Add edge to existing graph
+     */
+    public void addEdge(Dto.EdgeData edge) {
+        try {
+            String edgeJson = mapper.writeValueAsString(edge);
+            getElement().executeJs("this.addEdge($0)", edgeJson);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Update node status
+     */
+    public void updateNodeStatus(String nodeId, Dto.NodeStatus status) {
         String color = switch (status) {
             case IDLE -> "#97C2FC";        // Blu chiaro
             case REQUESTING -> "#FFD700";  // Oro/Giallo
@@ -49,15 +77,7 @@ public class NetworkGraph extends Component implements HasSize {
         getElement().executeJs("this.updateEdgeDirection($0, $1)", newHolderFrom, newHolderTo);
     }
 
-    /**
-     * Adatta lo zoom per mostrare tutti i nodi.
-     */
     public void fit() {
         getElement().executeJs("this.fitGraph()");
     }
-
-    // --- DTO Interni o esterni per comodità ---
-    public record NodeData(String id, String label) {}
-    public record EdgeData(String from, String to) {}
-    public enum NodeStatus { IDLE, REQUESTING, CRITICAL }
 }
