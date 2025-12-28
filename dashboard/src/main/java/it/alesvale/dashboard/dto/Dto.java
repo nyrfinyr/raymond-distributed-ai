@@ -1,9 +1,5 @@
 package it.alesvale.dashboard.dto;
 
-import jakarta.validation.constraints.NotNull;
-
-import java.util.Optional;
-
 public abstract class Dto {
 
     public record NodeId(String nodeId) {}
@@ -24,8 +20,9 @@ public abstract class Dto {
 
     public enum NodeEventType { I_AM_ALIVE, SHUTTING_DOWN, NODE_UPDATE }
 
-    public record NodeEvent(@NotNull NodeId nodeId,
-                            @NotNull NodeEventType eventType,
-                            Optional<NodeStatus> status,
-                            Optional<NodeId> edgeTo) {}
+    public record NodeEvent(NodeId nodeId,
+                            NodeEventType eventType,
+                            NodeStatus status,
+                            NodeId edgeTo) {
+    }
 }

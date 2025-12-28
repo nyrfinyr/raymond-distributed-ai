@@ -68,6 +68,20 @@ window.initNetworkGraph = (element) => {
         const rawNode = JSON.parse(nodeJson);
         nodes.add(mapNode(rawNode));
         network.fit();
+    };
+
+    element.addNode = (nodeJson) => {
+        const rawNode = JSON.parse(nodeJson);
+        const newNode = mapNode(rawNode);
+
+        const existingNode = nodes.get(newNode.id);
+
+        if (existingNode) {
+            nodes.update(newNode);
+        } else {
+            nodes.add(newNode);
+        }
+        //network.fit();
     }
 
     element.addEdge = (edgeJson) => {
@@ -87,7 +101,7 @@ window.initNetworkGraph = (element) => {
         }
 
         edges.add(newEdge);
-        network.fit();
+        //network.fit();
     }
 
     element.updateNodeColor = (nodeId, colorCode) => {

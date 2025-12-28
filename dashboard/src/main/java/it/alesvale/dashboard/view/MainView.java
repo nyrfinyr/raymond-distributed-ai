@@ -1,16 +1,21 @@
 package it.alesvale.dashboard.view;
 
+import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.router.Route;
+import com.vaadin.flow.shared.Registration;
 import it.alesvale.dashboard.backend.BrokerSubscriber;
 import it.alesvale.dashboard.dto.Dto;
 import it.alesvale.dashboard.frontendlib.NetworkGraph;
+
+import java.util.Objects;
 
 @Route("")
 public class MainView extends HorizontalLayout {
 
     private final NetworkGraph graph;
     private final BrokerSubscriber subscriber;
+    private Registration eventRegistration;
 
     public MainView(BrokerSubscriber subscriber){
 
@@ -24,7 +29,17 @@ public class MainView extends HorizontalLayout {
         setPadding(false);
         add(graph);
 
-        subscriber.getDispatcher(this::onNodeEvent);
+        eventRegistration = subscriber.getDispatcher(event ->
+                getUI().ifPresent(ui -> ui.access(() -> onNodeEvent(event))));
+    }
+
+    @Override
+    protected void onDetach(DetachEvent detachEvent) {
+        if (eventRegistration != null) {
+            eventRegistration.remove();
+            eventRegistration = null;
+        }
+        super.onDetach(detachEvent);
     }
 
     private void onNodeEvent(Dto.NodeEvent event){
@@ -33,6 +48,7 @@ public class MainView extends HorizontalLayout {
             case SHUTTING_DOWN -> shutdownEvent(event);
             case NODE_UPDATE -> updateEvent(event);
         }
+
     }
 
     private void aliveEvent(Dto.NodeEvent event){
@@ -42,11 +58,11 @@ public class MainView extends HorizontalLayout {
         Dto.NodeData node = new Dto.NodeData(nodeId, nodeId);
         graph.addNode(node);
 
-        event.status().ifPresent(status ->
-                graph.updateNodeStatus(nodeId, status));
+        if(!Objects.isNull(event.status()))
+            graph.updateNodeStatus(nodeId, event.status());
 
-        event.edgeTo().ifPresent(edgeTo ->
-                graph.addEdge(new Dto.EdgeData(nodeId, edgeTo.toString())));
+        if(!Objects.isNull(event.edgeTo()))
+            graph.addEdge(new Dto.EdgeData(nodeId, event.edgeTo().toString()));
     }
 
     private void shutdownEvent(Dto.NodeEvent event){
@@ -56,10 +72,10 @@ public class MainView extends HorizontalLayout {
     private void updateEvent(Dto.NodeEvent event){
         String nodeId = event.nodeId().toString();
 
-        event.status().ifPresent(status ->
-                graph.updateNodeStatus(nodeId, status));
+        if(!Objects.isNull(event.status()))
+            graph.updateNodeStatus(nodeId, event.status());
 
-        event.edgeTo().ifPresent(edgeTo ->
-                graph.addEdge(new Dto.EdgeData(nodeId, edgeTo.toString())));
+        if(!Objects.isNull(event.edgeTo()))
+            graph.addEdge(new Dto.EdgeData(nodeId, event.edgeTo().toString()));
     }
 }
