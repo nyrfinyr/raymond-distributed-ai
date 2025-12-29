@@ -53,9 +53,12 @@ public class MainView extends HorizontalLayout {
 
     private void aliveEvent(Dto.NodeEvent event){
 
-        String nodeId = event.nodeId().toString();
+        String nodeId = event.nodeId().nodeId();
+        String label = nodeId.subSequence(0, 4).toString();
+        label = event.leader() ? label + " (Root)" : label;
 
-        Dto.NodeData node = new Dto.NodeData(nodeId, nodeId);
+        Dto.NodeData node = new Dto.NodeData(nodeId, label);
+
         graph.addNode(node);
 
         if(!Objects.isNull(event.status()))

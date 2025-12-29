@@ -66,12 +66,6 @@ window.initNetworkGraph = (element) => {
 
     element.addNode = (nodeJson) => {
         const rawNode = JSON.parse(nodeJson);
-        nodes.add(mapNode(rawNode));
-        network.fit();
-    };
-
-    element.addNode = (nodeJson) => {
-        const rawNode = JSON.parse(nodeJson);
         const newNode = mapNode(rawNode);
 
         const existingNode = nodes.get(newNode.id);

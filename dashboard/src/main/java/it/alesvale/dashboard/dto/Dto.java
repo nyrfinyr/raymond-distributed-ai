@@ -23,6 +23,7 @@ public abstract class Dto {
     public record NodeEvent(NodeId nodeId,
                             NodeEventType eventType,
                             NodeStatus status,
-                            NodeId edgeTo) {
+                            NodeId edgeTo,
+                            boolean leader) {
     }
 }

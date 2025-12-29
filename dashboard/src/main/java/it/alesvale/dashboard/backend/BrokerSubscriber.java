@@ -16,7 +16,7 @@ public class BrokerSubscriber {
 
     private final Connection brokerConnection;
     private final ObjectMapper mapper;
-    private static final String SUBJECT_NAME = "updates";
+    private static final String SUBJECT_NAME = "dashboard";
 
     public BrokerSubscriber(Connection brokerConnection,
                             ObjectMapper mapper) {
