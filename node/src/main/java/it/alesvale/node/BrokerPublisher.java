@@ -13,7 +13,8 @@ public class BrokerPublisher {
 
     public BrokerPublisher() {
         try {
-            this.brokerConnection = Nats.connect("nats://localhost:4222");
+            String brokerUrl = System.getenv("BROKER_URL");
+            this.brokerConnection = Nats.connect(brokerUrl);
             this.mapper = new ObjectMapper();
         }catch( Exception e ){
             throw new RuntimeException(e);

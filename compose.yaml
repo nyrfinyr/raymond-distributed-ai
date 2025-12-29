@@ -6,7 +6,7 @@ services:
       - swarm-net
     command: "-js -m 8222"
     ports:
-      - "4222:4222"
+#      - "4222:4222"
       - "8222:8222"
     deploy:
       replicas: 1
@@ -15,9 +15,12 @@ services:
 
   # 2. Dashboard
   dashboard:
-    image: mydashboard:latest
+    image: dashboard:latest
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
     ports:
-      - "8080:80"
+      - "8091:8080"
     environment:
       - BROKER_URL=nats://broker:4222
     networks:
@@ -30,15 +33,17 @@ services:
       restart_policy:
         condition: on-failure
 
-  node-worker:
-    image: mynode:latest
+  node:
+    image: node-worker:latest
+    build:
+      context: ./node
+      dockerfile: Dockerfile
     environment:
       - BROKER_URL=nats://broker:4222
-      - NODE_ID={{.Task.Slot}}
     networks:
       - swarm-net
     deploy:
-      replicas: 3
+      replicas: 1
       update_config:
         parallelism: 2
         delay: 10s

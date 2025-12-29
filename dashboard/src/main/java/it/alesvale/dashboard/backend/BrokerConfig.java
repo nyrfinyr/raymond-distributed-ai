@@ -12,6 +12,7 @@ public class BrokerConfig {
 
     @Bean
     public Connection natsConnection() throws IOException, InterruptedException {
-        return Nats.connect("nats://localhost:4222");
+        String brokerUrl = System.getenv("BROKER_URL");
+        return Nats.connect(brokerUrl);
     }
 }
