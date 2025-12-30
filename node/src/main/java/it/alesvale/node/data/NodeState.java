@@ -6,9 +6,9 @@ import lombok.Data;
 @Data
 public class NodeState {
 
-    private final Dto.NodeId id = new Dto.NodeId(Utils.generateNodeId());
+    private final Dto.NodeId id = new Dto.NodeId(Utils.generateNodeId(), null); //todo: find swarm name
     private Dto.NodeStatus status = Dto.NodeStatus.IDLE;
-    private Dto.NodeId edgeTo = null;
+    private Dto.NodeId parent = null;
 
     //Leader election
     private volatile Dto.NodeId leaderId = this.id;

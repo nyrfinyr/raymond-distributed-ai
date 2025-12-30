@@ -1,10 +1,19 @@
 package it.alesvale.node.logic;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nats.client.Dispatcher;
 import io.nats.client.Message;
 import it.alesvale.node.broker.Broker;
 import it.alesvale.node.data.Dto;
 import it.alesvale.node.data.NodeState;
+import lombok.extern.slf4j.Slf4j;
+
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Gestisce il processo di elezione del leader all'interno del cluster utilizzando un approccio
@@ -27,19 +36,28 @@ import it.alesvale.node.data.NodeState;
  * </ol>
  * Questo meccanismo assicura che, eventualmente, l'ID più piccolo del cluster si diffonda a tutti i nodi.
  */
+@Slf4j
 public class LeaderElection {
 
     Broker broker;
     NodeState nodeState;
+    ObjectMapper mapper;
+    Integer DEBOUNCE_TIME_S = 20;
 
-    /**
-     * Inizializza il processo di elezione.
-     *
-     * @param nodeState Lo stato corrente del nodo, contenente l'informazione su chi è il leader attuale.
-     */
+    private final ScheduledExecutorService debounceScheduler = Executors.newSingleThreadScheduledExecutor();
+    private ScheduledFuture<?> silenceTask;
+    private Runnable onStabilizedCallback;
+    private final AtomicBoolean isStable = new AtomicBoolean(false);
+
     public LeaderElection(NodeState nodeState, Broker broker){
         this.broker = broker;
         this.nodeState = nodeState;
+        mapper = new ObjectMapper();
+    }
+
+    public LeaderElection then(Runnable onStabilizedCallback){
+        this.onStabilizedCallback = onStabilizedCallback;
+        return this;
     }
 
     /**
@@ -48,32 +66,54 @@ public class LeaderElection {
      * Sottoscrive il nodo al topic "leader-election" e invia il primo messaggio di gossip
      * contenente l'ID del leader attualmente noto.
      */
-    public void start() throws InterruptedException {
+    public void start() {
+
+        log.info("[{}] Starting leader election",
+                nodeState.getId().getHumanReadableId());
 
         Dispatcher d = broker.createDispatcher(msg -> handleLeaderEvent(msg, this.nodeState));
-
         d.subscribe("leader-election");
-
-        Thread.sleep(1000);
-        broker.publishId(nodeState.getLeaderId().nodeId(), "leader-election");
+        try {
+            broker.publishId(nodeState.getLeaderId(), "leader-election");
+        }catch(JsonProcessingException e){
+            throw new RuntimeException(e);
+        }
     }
 
     /**
      * Gestisce la ricezione di un evento di elezione (messaggio di gossip).
-     * <p>
-     * Implementa la logica di aggiornamento e propagazione: se il senderId ricevuto è migliore (minore)
-     * del leader attuale, aggiorna lo stato locale e propaga la notizia alla rete.
-     *
-     * @param message   Il messaggio ricevuto dal broker contenente l'ID del leader proposto.
-     * @param nodeState Lo stato del nodo da aggiornare in caso di nuovo leader.
      */
     private void handleLeaderEvent(Message message, NodeState nodeState){
-        Dto.NodeId senderId = new Dto.NodeId(new String(message.getData()));
+        rescheduleStabilityCheck();
 
-        if(senderId.compareTo(nodeState.getLeaderId()) < 0){
-            nodeState.setLeaderId(senderId);
-            broker.publishId(nodeState.getLeaderId().nodeId(), "leader-election");
+        try {
+            Dto.NodeId proposedLeaderId = mapper.readValue(message.getData(), Dto.NodeId.class);
+            Dto.NodeId currentLeaderId = nodeState.getLeaderId();
+
+                if (proposedLeaderId.compareTo(currentLeaderId) < 0) {
+                    nodeState.setLeaderId(proposedLeaderId);
+                    broker.publishId(nodeState.getLeaderId(), "leader-election");
+                }
+                else if (proposedLeaderId.compareTo(currentLeaderId) > 0) {
+                    broker.publishId(currentLeaderId, "leader-election");
+                }
+            }catch(Exception e){
+                throw new RuntimeException(e);
+            }
+    }
+
+    private synchronized void rescheduleStabilityCheck() {
+        if (silenceTask != null && !silenceTask.isDone()) {
+            silenceTask.cancel(false);
         }
 
+        silenceTask = debounceScheduler.schedule(() -> {
+            log.info("[{}] Leader Election stabilized ({}s silence). Leader is {}",
+                    nodeState.getId().getHumanReadableId(), DEBOUNCE_TIME_S, nodeState.getLeaderId().getHumanReadableId());
+            
+            if (onStabilizedCallback != null && isStable.compareAndSet(false, true)) {
+                onStabilizedCallback.run();
+            }
+        }, DEBOUNCE_TIME_S, TimeUnit.SECONDS);
     }
 }

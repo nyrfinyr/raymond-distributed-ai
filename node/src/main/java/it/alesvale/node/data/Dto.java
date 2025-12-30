@@ -1,18 +1,23 @@
 package it.alesvale.node.data;
 
-
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Builder;
 
 import java.util.UUID;
 
 public abstract class Dto {
 
-    public record NodeId(String nodeId) implements Comparable<NodeId> {
-        public NodeId(UUID uuid){
-            this(uuid.toString());
-        }
+    public record NodeId(String nodeId, String swarmName)
+            implements Comparable<NodeId> {
+
+        @JsonIgnore
         public UUID getIdAsUUID(){
             return UUID.fromString(nodeId);
+        }
+
+        @JsonIgnore
+        public String getHumanReadableId() {
+            return nodeId.substring(0, 4);
         }
 
         @Override
@@ -31,4 +36,5 @@ public abstract class Dto {
                             NodeStatus status,
                             NodeId edgeTo,
                             boolean leader) {}
+
 }

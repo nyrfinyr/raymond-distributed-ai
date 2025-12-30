@@ -1,10 +1,9 @@
 package it.alesvale.node.broker;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nats.client.*;
 import it.alesvale.node.data.Dto;
-
-import java.io.IOException;
 
 public class Broker {
 
@@ -25,12 +24,11 @@ public class Broker {
         return brokerConnection.createDispatcher(handler);
     }
 
-    public void publishId(String nodeId, String subject){
-        brokerConnection.publish(subject, nodeId.getBytes());
+    public void publishId(Dto.NodeId nodeId, String subject) throws JsonProcessingException {
+        brokerConnection.publish(subject, mapper.writeValueAsBytes(nodeId));
     }
 
-    public void publishEvent(Dto.NodeEvent nodeEvent) throws IOException {
+    public void publishEvent(Dto.NodeEvent nodeEvent) throws JsonProcessingException {
         brokerConnection.publish("dashboard", mapper.writeValueAsBytes(nodeEvent));
     }
-
 }

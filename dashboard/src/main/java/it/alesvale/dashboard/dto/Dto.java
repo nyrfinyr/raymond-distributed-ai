@@ -1,20 +1,28 @@
 package it.alesvale.dashboard.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import java.util.UUID;
+
 public abstract class Dto {
 
-    public record NodeId(String nodeId) {}
+    public record NodeId(String nodeId, String swarmName)
+            implements Comparable<NodeId> {
 
-    public record NodeData(NodeId nodeId, String label) {
-        public NodeData(String nodeId, String label){
-            this(new NodeId(nodeId), label);
+        @JsonIgnore
+        public UUID getIdAsUUID(){
+            return UUID.fromString(nodeId);
+        }
+
+        @Override
+        public int compareTo(NodeId o) {
+            return this.getIdAsUUID().compareTo(o.getIdAsUUID());
         }
     }
 
-    public record EdgeData(NodeId from, NodeId to) {
-        public EdgeData(String from, String to){
-            this(new NodeId(from), new NodeId(to));
-        }
-    }
+    public record NodeData(NodeId nodeId, String label) {}
+
+    public record EdgeData(NodeId from, NodeId to) {}
 
     public enum NodeStatus { IDLE, REQUESTING, CRITICAL }
 

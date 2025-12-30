@@ -53,8 +53,8 @@ public class MainView extends HorizontalLayout {
 
     private void aliveEvent(Dto.NodeEvent event){
 
-        String nodeId = event.nodeId().nodeId();
-        String label = nodeId.subSequence(0, 4).toString();
+        Dto.NodeId nodeId = event.nodeId();
+        String label = nodeId.nodeId().subSequence(0, 4).toString();
         label = event.leader() ? label + " (Root)" : label;
 
         Dto.NodeData node = new Dto.NodeData(nodeId, label);
@@ -65,7 +65,7 @@ public class MainView extends HorizontalLayout {
             graph.updateNodeStatus(nodeId, event.status());
 
         if(!Objects.isNull(event.edgeTo()))
-            graph.addEdge(new Dto.EdgeData(nodeId, event.edgeTo().toString()));
+            graph.addEdge(new Dto.EdgeData(nodeId, event.edgeTo()));
     }
 
     private void shutdownEvent(Dto.NodeEvent event){
@@ -73,12 +73,12 @@ public class MainView extends HorizontalLayout {
     }
 
     private void updateEvent(Dto.NodeEvent event){
-        String nodeId = event.nodeId().toString();
+        Dto.NodeId nodeId = event.nodeId();
 
         if(!Objects.isNull(event.status()))
             graph.updateNodeStatus(nodeId, event.status());
 
         if(!Objects.isNull(event.edgeTo()))
-            graph.addEdge(new Dto.EdgeData(nodeId, event.edgeTo().toString()));
+            graph.addEdge(new Dto.EdgeData(nodeId, event.edgeTo()));
     }
 }
