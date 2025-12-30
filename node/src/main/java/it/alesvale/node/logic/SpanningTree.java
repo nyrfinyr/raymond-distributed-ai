@@ -8,6 +8,7 @@ import it.alesvale.node.data.Dto;
 import it.alesvale.node.data.NodeState;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -20,6 +21,7 @@ public class SpanningTree {
     private ObjectMapper mapper;
     private Dispatcher dispatcher;
     private ScheduledExecutorService scheduler;
+    private Random random;
     private final String SUBJECT_NAME = "spanning-tree";
 
     public SpanningTree(Broker broker, NodeState nodeState){
@@ -27,6 +29,7 @@ public class SpanningTree {
         this.nodeState = nodeState;
         this.mapper = new ObjectMapper();
         this.scheduler = Executors.newSingleThreadScheduledExecutor();
+        this.random = new Random();
     }
 
     public void start(){
@@ -77,7 +80,8 @@ public class SpanningTree {
                 this.dispatcher.unsubscribe(SUBJECT_NAME);
             }
 
-            scheduler.scheduleAtFixedRate(this::periodicAnnouncement, 500, 2000, TimeUnit.MILLISECONDS);
+            long initialDelay = random.nextInt(2000);
+            scheduler.scheduleAtFixedRate(this::periodicAnnouncement, initialDelay, 2000, TimeUnit.MILLISECONDS);
             log.info("[{}] Publishing my id to spanning tree", nodeState.getId().getHumanReadableId());
         }catch(Exception e){
             throw new RuntimeException(e);

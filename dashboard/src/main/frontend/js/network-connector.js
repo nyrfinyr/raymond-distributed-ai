@@ -5,12 +5,18 @@ window.initNetworkGraph = (element) => {
     const nodes = new DataSet([]);
     const edges = new DataSet([]);
 
-    // 2. Configurazione Vis.js per l'algoritmo di Raymond
+    // 2. Configurazione Vis.js
     const options = {
         nodes: {
             shape: 'dot',
             size: 30,
-            font: { size: 16, color: '#000000' },
+            font: { 
+                size: 16, 
+                color: '#000000',
+                face: 'arial',
+                strokeWidth: 3,
+                strokeColor: '#ffffff'
+            },
             borderWidth: 2,
             shadow: true
         },
@@ -18,17 +24,32 @@ window.initNetworkGraph = (element) => {
             width: 2,
             color: { color: '#848484', highlight: '#848484'},
             arrows: 'to',
-            smooth: { type: 'continuous' }
+            smooth: {
+                type: 'cubicBezier', 
+                forceDirection: 'vertical', 
+                roundness: 0.4 
+            } 
         },
         physics: {
-            enabled: true,
-            solver: 'forceAtlas2Based', // Buon layout per alberi
-            stabilization: { iterations: 150 }
+            enabled: false 
+        },
+        layout: {
+            hierarchical: {
+                enabled: true,
+                direction: 'DU',        
+                sortMethod: 'directed', 
+                nodeSpacing: 250,
+                levelSeparation: 200,
+                
+                blockShifting: true,
+                edgeMinimization: true,
+                parentCentralization: true,
+                shakeTowards: 'roots'   
+            }
         },
         interaction: { dragNodes: true, zoomView: true }
     };
 
-    // 3. Creazione del Network dentro il <div> (element) passato da Java
     const network = new Network(element, { nodes, edges }, options);
 
     // Helper per convertire il DTO Java (nested) nel formato piatto di Vis.js
@@ -82,20 +103,27 @@ window.initNetworkGraph = (element) => {
         const rawEdge = JSON.parse(edgeJson);
         const newEdge = mapEdge(rawEdge);
 
-        const existingEdges = edges.get({
+        const exactMatch = edges.get({
             filter: function (item) {
-                return (item.from === newEdge.from && item.to === newEdge.to) ||
-                    (item.from === newEdge.to && item.to === newEdge.from);
+                return item.from === newEdge.from && item.to === newEdge.to;
             }
         });
 
-        if (existingEdges.length > 0) {
-            const idsToRemove = existingEdges.map(edge => edge.id);
-            edges.remove(idsToRemove);
+        if (exactMatch.length > 0) {
+            return;
+        }
+
+        const reverseMatch = edges.get({
+            filter: function (item) {
+                return item.from === newEdge.to && item.to === newEdge.from;
+            }
+        });
+
+        if (reverseMatch.length > 0) {
+            edges.remove(reverseMatch.map(e => e.id));
         }
 
         edges.add(newEdge);
-        //network.fit();
     }
 
     element.updateNodeColor = (nodeId, colorCode) => {
@@ -105,15 +133,27 @@ window.initNetworkGraph = (element) => {
     };
 
     element.updateEdgeDirection = (fromId, toId) => {
-        const items = edges.get({
+
+        const existingCorrect = edges.get({
             filter: function (item) {
-                return (item.from === fromId && item.to === toId) ||
-                    (item.from === toId && item.to === fromId);
+                return item.from === fromId && item.to === toId;
             }
         });
 
-        if (items.length > 0) {
-            edges.remove(items[0].id);
+        if (existingCorrect.length > 0) {
+            return;
+        }
+
+        const existingReverse = edges.get({
+            filter: function (item) {
+                return item.from === toId && item.to === fromId;
+            }
+        });
+
+        if (existingReverse.length > 0) {
+            edges.remove(existingReverse[0].id);
+            edges.add({ from: fromId, to: toId });
+        } else {
             edges.add({ from: fromId, to: toId });
         }
     };
