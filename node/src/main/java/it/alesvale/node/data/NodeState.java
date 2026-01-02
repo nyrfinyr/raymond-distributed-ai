@@ -6,12 +6,17 @@ import lombok.Data;
 @Data
 public class NodeState {
 
-    private final Dto.NodeId id = new Dto.NodeId(Utils.generateNodeId(), null); //todo: find swarm name
-    private Dto.NodeStatus status = Dto.NodeStatus.IDLE;
-    private Dto.NodeId parent = null;
+    private final Dto.NodeId id;
+    private Dto.NodeStatus status;
+    private Dto.NodeId parent;
+    private volatile Dto.NodeId leaderId;
 
-    //Leader election
-    private volatile Dto.NodeId leaderId = this.id;
+    public NodeState(String swarmName) {
+        this.id = new Dto.NodeId(Utils.generateNodeId(), swarmName);
+        this.status = Dto.NodeStatus.IDLE;
+        this.parent = null;
+        this.leaderId = this.id;
+    }
 
     public boolean isLeader(){
         return this.leaderId.nodeId().equals(this.id.nodeId());

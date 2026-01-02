@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nats.client.Dispatcher;
 import io.nats.client.Message;
+import it.alesvale.node.Utils;
 import it.alesvale.node.broker.Broker;
 import it.alesvale.node.data.Dto;
 import it.alesvale.node.data.NodeState;
@@ -52,7 +53,7 @@ public class LeaderElection {
     public LeaderElection(NodeState nodeState, Broker broker){
         this.broker = broker;
         this.nodeState = nodeState;
-        mapper = new ObjectMapper();
+        this.mapper = Utils.getMapper();
     }
 
     public LeaderElection then(Runnable onStabilizedCallback){
@@ -68,8 +69,8 @@ public class LeaderElection {
      */
     public void start() {
 
-        log.info("[{}] Starting leader election",
-                nodeState.getId().getHumanReadableId());
+        log.info("[{}] Starting leader election", nodeState.getId().getHumanReadableId());
+        broker.publishInfoMessage(nodeState.getId(), "Starting leader election");
 
         Dispatcher d = broker.createDispatcher(msg -> handleLeaderEvent(msg, this.nodeState));
         d.subscribe("leader-election");
@@ -90,16 +91,16 @@ public class LeaderElection {
             Dto.NodeId proposedLeaderId = mapper.readValue(message.getData(), Dto.NodeId.class);
             Dto.NodeId currentLeaderId = nodeState.getLeaderId();
 
-                if (proposedLeaderId.compareTo(currentLeaderId) < 0) {
-                    nodeState.setLeaderId(proposedLeaderId);
-                    broker.publishId(nodeState.getLeaderId(), "leader-election");
-                }
-                else if (proposedLeaderId.compareTo(currentLeaderId) > 0) {
-                    broker.publishId(currentLeaderId, "leader-election");
-                }
-            }catch(Exception e){
-                throw new RuntimeException(e);
+            if (proposedLeaderId.compareTo(currentLeaderId) < 0) {
+                nodeState.setLeaderId(proposedLeaderId);
+                broker.publishId(nodeState.getLeaderId(), "leader-election");
             }
+            else if (proposedLeaderId.compareTo(currentLeaderId) > 0) {
+                broker.publishId(currentLeaderId, "leader-election");
+            }
+        }catch(Exception e){
+            throw new RuntimeException(e);
+        }
     }
 
     private synchronized void rescheduleStabilityCheck() {
@@ -110,6 +111,7 @@ public class LeaderElection {
         silenceTask = debounceScheduler.schedule(() -> {
             log.info("[{}] Leader Election stabilized ({}s silence). Leader is {}",
                     nodeState.getId().getHumanReadableId(), DEBOUNCE_TIME_S, nodeState.getLeaderId().getHumanReadableId());
+            broker.publishInfoMessage(nodeState.getLeaderId(), "Leader Election stabilized");
             
             if (onStabilizedCallback != null && isStable.compareAndSet(false, true)) {
                 onStabilizedCallback.run();

@@ -3,6 +3,7 @@ package it.alesvale.node.data;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Builder;
 
+import java.time.Instant;
 import java.util.UUID;
 
 public abstract class Dto {
@@ -28,11 +29,13 @@ public abstract class Dto {
 
     public enum NodeStatus { IDLE, REQUESTING, CRITICAL }
 
-    public enum NodeEventType { I_AM_ALIVE, SHUTTING_DOWN, NODE_UPDATE }
+    public enum NodeEventType { I_AM_ALIVE, NODE_INFO }
 
     @Builder
     public record NodeEvent(NodeId nodeId,
                             NodeEventType eventType,
+                            String message,
+                            Instant timestamp,
                             NodeStatus status,
                             NodeId edgeTo,
                             boolean leader) {}

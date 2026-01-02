@@ -2,6 +2,7 @@ package it.alesvale.dashboard.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+import java.time.Instant;
 import java.util.UUID;
 
 public abstract class Dto {
@@ -12,6 +13,11 @@ public abstract class Dto {
         @JsonIgnore
         public UUID getIdAsUUID(){
             return UUID.fromString(nodeId);
+        }
+
+        @JsonIgnore
+        public String getHumanReadableId() {
+            return nodeId.substring(0, 4);
         }
 
         @Override
@@ -26,10 +32,12 @@ public abstract class Dto {
 
     public enum NodeStatus { IDLE, REQUESTING, CRITICAL }
 
-    public enum NodeEventType { I_AM_ALIVE, SHUTTING_DOWN, NODE_UPDATE }
+    public enum NodeEventType { I_AM_ALIVE, NODE_INFO }
 
     public record NodeEvent(NodeId nodeId,
                             NodeEventType eventType,
+                            Instant timestamp,
+                            String message,
                             NodeStatus status,
                             NodeId edgeTo,
                             boolean leader) {

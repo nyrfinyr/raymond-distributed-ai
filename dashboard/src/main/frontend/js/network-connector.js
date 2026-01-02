@@ -72,16 +72,22 @@ window.initNetworkGraph = (element) => {
         };
     };
 
-    element.setGraphData = (nodesJson, edgesJson) => {
-        nodes.clear();
-        edges.clear();
+    // Event listener per il click sui nodi
+    network.on('click', function(params) {
+        if (params.nodes.length > 0) {
+            const nodeId = params.nodes[0];
+            console.log("onClick: " + nodeId);
+            element.$server.onNodeClicked(nodeId);
+        }
+    });
 
+    element.setGraphData = (nodesJson, edgesJson) => {
         const rawNodes = JSON.parse(nodesJson);
         const rawEdges = JSON.parse(edgesJson);
-
+        nodes.clear();
+        edges.clear();
         nodes.add(rawNodes.map(mapNode));
         edges.add(rawEdges.map(mapEdge));
-
         network.fit();
     };
 

@@ -39,6 +39,7 @@ cd /mnt/c/Users/alesv/IdeaProjects/raymond-distributed-ai/node || exit 1
 ./gradlew installDist
 
 export BROKER_URL=nats://localhost:4222
+export SWARM_SERVICE_NAME="localhost"
 
 rm nodes.log 2>/dev/null
 touch nodes.log

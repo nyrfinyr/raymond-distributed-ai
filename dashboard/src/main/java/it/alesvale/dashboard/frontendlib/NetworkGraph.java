@@ -1,14 +1,12 @@
 package it.alesvale.dashboard.frontendlib;
 
-import com.vaadin.flow.component.Component;
-import com.vaadin.flow.component.HasSize;
-import com.vaadin.flow.component.Tag;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vaadin.flow.component.*;
 import com.vaadin.flow.component.dependency.JsModule;
 import com.vaadin.flow.component.dependency.NpmPackage;
 import it.alesvale.dashboard.dto.Dto;
-import tools.jackson.databind.ObjectMapper;
 
-import java.util.List;
+import java.util.function.Consumer;
 
 @Tag("div")
 @NpmPackage(value = "vis-network", version = "9.1.9")
@@ -16,24 +14,29 @@ import java.util.List;
 @JsModule("./js/network-connector.js")
 public class NetworkGraph extends Component implements HasSize {
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper;
+    private Consumer<String> nodeClickListener;
 
-    public NetworkGraph() {
+    public NetworkGraph(ObjectMapper mapper) {
         this.setId("raymond-graph");
         this.setSizeFull();
+        this.mapper = mapper;
+    }
+
+    public void addNodeClickListener(Consumer<String> listener) {
+        this.nodeClickListener = listener;
+    }
+
+    @Override
+    protected void onAttach(AttachEvent attachEvent){
+        super.onAttach(attachEvent);
         getElement().executeJs("window.initNetworkGraph($0)", getElement());
     }
 
-    /**
-     * Load graph topology
-     */
-    public void setTopology(List<Dto.NodeData> nodes, List<Dto.EdgeData> edges) {
-        try {
-            String nodesJson = mapper.writeValueAsString(nodes);
-            String edgesJson = mapper.writeValueAsString(edges);
-            getElement().executeJs("this.setGraphData($0, $1)", nodesJson, edgesJson);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+    @ClientCallable
+    public void onNodeClicked(String nodeId) {
+        if (nodeClickListener != null) {
+            nodeClickListener.accept(nodeId);
         }
     }
 
@@ -77,7 +80,4 @@ public class NetworkGraph extends Component implements HasSize {
         getElement().executeJs("this.updateEdgeDirection($0, $1)", newHolderFrom, newHolderTo);
     }
 
-    public void fit() {
-        getElement().executeJs("this.fitGraph()");
-    }
 }

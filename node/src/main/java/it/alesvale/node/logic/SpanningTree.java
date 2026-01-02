@@ -3,6 +3,7 @@ package it.alesvale.node.logic;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nats.client.Dispatcher;
 import io.nats.client.Message;
+import it.alesvale.node.Utils;
 import it.alesvale.node.broker.Broker;
 import it.alesvale.node.data.Dto;
 import it.alesvale.node.data.NodeState;
@@ -27,7 +28,7 @@ public class SpanningTree {
     public SpanningTree(Broker broker, NodeState nodeState){
         this.broker = broker;
         this.nodeState = nodeState;
-        this.mapper = new ObjectMapper();
+        this.mapper = Utils.getMapper();
         this.scheduler = Executors.newSingleThreadScheduledExecutor();
         this.random = new Random();
     }
@@ -35,8 +36,8 @@ public class SpanningTree {
     public void start(){
 
         try {
-            log.info("[{}] Starting spanning tree algorithm",
-                    nodeState.getId().getHumanReadableId());
+            log.info("[{}] Starting spanning tree algorithm", nodeState.getId().getHumanReadableId());
+            broker.publishInfoMessage(nodeState.getId(), "Starting spanning tree algorithm");
 
             if (nodeState.isLeader()) {
                 log.info("[{}] I'm leader, starting periodic announcement", nodeState.getId().getHumanReadableId());
@@ -57,7 +58,7 @@ public class SpanningTree {
             broker.publishId(nodeState.getId(), SUBJECT_NAME);
             log.debug("[{}] Broadcasting leader ID for Spanning Tree...", nodeState.getId().getHumanReadableId());
         } catch (Exception e) {
-            log.error("Error publishing leader ID", e);
+            log.error("[{}] Error publishing leader ID", nodeState.getId().getHumanReadableId(), e);
         }
     }
 
@@ -74,6 +75,7 @@ public class SpanningTree {
 
             nodeState.setParent(nodeId);
             log.info("[{}] Parent set: {}", nodeState.getId().getHumanReadableId(), nodeId.getHumanReadableId());
+            broker.publishInfoMessage(nodeState.getId(), "Parent set to " + nodeId.getHumanReadableId());
 
             if (this.dispatcher != null) {
                 log.info("[{}] Unsubscribing from spanning tree events", nodeState.getId().getHumanReadableId());

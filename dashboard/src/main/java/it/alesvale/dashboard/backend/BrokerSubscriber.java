@@ -27,7 +27,7 @@ public class BrokerSubscriber {
     public Registration getDispatcher(Consumer<Dto.NodeEvent> consumer) {
         Dispatcher dispatcher = brokerConnection.createDispatcher((msg) -> {
            Dto.NodeEvent nodeEvent = mapper.readValue(msg.getData(), Dto.NodeEvent.class);
-           log.info("Received node event: {}", nodeEvent);
+           log.trace("Received node event: {}", nodeEvent);
            consumer.accept(nodeEvent);
         });
         dispatcher.subscribe(SUBJECT_NAME);
