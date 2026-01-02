@@ -1,4 +1,4 @@
-package it.alesvale.node.logic;
+package it.alesvale.node.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -8,6 +8,7 @@ import it.alesvale.node.Utils;
 import it.alesvale.node.broker.Broker;
 import it.alesvale.node.data.Dto;
 import it.alesvale.node.data.NodeState;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.concurrent.Executors;
@@ -38,7 +39,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Questo meccanismo assicura che, eventualmente, l'ID più piccolo del cluster si diffonda a tutti i nodi.
  */
 @Slf4j
-public class LeaderElection {
+public class LeaderElectionService implements AgentService{
 
     Broker broker;
     NodeState nodeState;
@@ -47,18 +48,14 @@ public class LeaderElection {
 
     private final ScheduledExecutorService debounceScheduler = Executors.newSingleThreadScheduledExecutor();
     private ScheduledFuture<?> silenceTask;
-    private Runnable onStabilizedCallback;
     private final AtomicBoolean isStable = new AtomicBoolean(false);
+    @Setter
+    private Runnable onStabilizedCallback;
 
-    public LeaderElection(NodeState nodeState, Broker broker){
+    public LeaderElectionService(NodeState nodeState, Broker broker){
         this.broker = broker;
         this.nodeState = nodeState;
         this.mapper = Utils.getMapper();
-    }
-
-    public LeaderElection then(Runnable onStabilizedCallback){
-        this.onStabilizedCallback = onStabilizedCallback;
-        return this;
     }
 
     /**
@@ -111,7 +108,7 @@ public class LeaderElection {
         silenceTask = debounceScheduler.schedule(() -> {
             log.info("[{}] Leader Election stabilized ({}s silence). Leader is {}",
                     nodeState.getId().getHumanReadableId(), DEBOUNCE_TIME_S, nodeState.getLeaderId().getHumanReadableId());
-            broker.publishInfoMessage(nodeState.getLeaderId(), "Leader Election stabilized");
+            broker.publishInfoMessage(nodeState.getId(), "Leader Election stabilized");
             
             if (onStabilizedCallback != null && isStable.compareAndSet(false, true)) {
                 onStabilizedCallback.run();

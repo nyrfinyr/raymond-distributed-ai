@@ -3,91 +3,44 @@ package it.alesvale.node;
 import it.alesvale.node.broker.Broker;
 import it.alesvale.node.data.Dto;
 import it.alesvale.node.data.NodeState;
-import it.alesvale.node.logic.LeaderElection;
-import it.alesvale.node.logic.SpanningTree;
+import it.alesvale.node.data.StateMachine;
+import it.alesvale.node.service.*;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
-import java.net.ServerSocket;
-import java.net.Socket;
+import java.net.UnknownHostException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
 public class NodeApplication {
 
-    private static final int MIN_PORT = 20000;
-    private static final int MAX_PORT = 60000;
+    public static void main(String[] args) throws UnknownHostException {
 
-    public static void main(String[] args) {
-
-        String discoveryHost = System.getenv().getOrDefault("SWARM_SERVICE_NAME", "localhost");
-        ServerSocket serverSocket = initializeServerSocket();
         Broker broker = new Broker();
+        SocketManager socketManager = new SocketManager();
+        Dto.SocketAddress socketAddress = socketManager.getSocketAddress();
+        NodeState state = new NodeState(socketAddress);
 
-        String swarmName = String.format("%s:%s", discoveryHost, serverSocket.getLocalPort());
+        log.info("[{}] Socket address: {}", state.getId().getHumanReadableId(), socketAddress);
 
-        NodeState state = new NodeState(swarmName);
-        log.info("[{}] Swarm name: {}", state.getId().getHumanReadableId(), swarmName);
-
-        SpanningTree spanningTree = new SpanningTree(broker, state);
-        LeaderElection leaderElection = new LeaderElection(state, broker)
-                .then(spanningTree::start);
-
-        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(3);
+        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
         scheduler.scheduleAtFixedRate(() -> sendAliveEvent(broker, state), 0, 3, TimeUnit.SECONDS);
 
-        leaderElection.start();
-    }
+        StateMachine<Dto.AgentState> agentStateMachine = new StateMachine<>();
+        LeaderElectionService leaderElectionService = new LeaderElectionService(state, broker);
+        SpanningTreeService spanningTreeService = new SpanningTreeService(state, broker);
+        RaymondService raymondService = new RaymondService(state, broker, socketManager);
 
-    /**
-     * Tenta di aprire una ServerSocket su una porta casuale.
-     * Se fallisce, riprova finché non ne trova una libera.
-     */
-    private static ServerSocket initializeServerSocket() {
-        ServerSocket socket = null;
-        while (socket == null) {
-            int randomPort = ThreadLocalRandom.current().nextInt(MIN_PORT, MAX_PORT);
-            try {
-                socket = new ServerSocket(randomPort);
-                log.info("Socket Server avviato correttamente sulla porta: {}", randomPort);
-            } catch (IOException e) {
-                log.warn("Porta {} occupata o non disponibile. Riprovo...", randomPort);
-            }
-        }
-        return socket;
-    }
+        agentStateMachine.onStateAction(Dto.AgentState.LEADER_ELECTION, leaderElectionService);
+        agentStateMachine.onStateAction(Dto.AgentState.BUILDING_SPANNING_TREE, spanningTreeService);
+        agentStateMachine.onStateAction(Dto.AgentState.RAYMOND_MUTUAL_EXCLUSION, raymondService);
 
-    /**
-     * Avvia un thread separato per accettare le connessioni in ingresso
-     * senza bloccare il main thread.
-     */
-    private static void startAcceptThread(ServerSocket serverSocket) {
-        Thread acceptThread = new Thread(() -> {
-            try {
-                while (!serverSocket.isClosed()) {
-                    Socket clientSocket = serverSocket.accept();
-                    handleIncomingConnection(clientSocket);
-                }
-            } catch (IOException e) {
-                log.error("Errore nel thread di ascolto socket", e);
-            }
-        });
-        acceptThread.setName("Socket-Acceptor");
-        acceptThread.start();
-    }
+        leaderElectionService.setOnStabilizedCallback(() -> agentStateMachine.setState(Dto.AgentState.BUILDING_SPANNING_TREE));
+        spanningTreeService.setOnStabilizedCallback(() -> agentStateMachine.setState(Dto.AgentState.RAYMOND_MUTUAL_EXCLUSION));
 
-    private static void handleIncomingConnection(Socket clientSocket) {
-        new Thread(() -> {
-            try {
-                log.info("Nuova connessione accettata da: {}", clientSocket.getInetAddress());
-                clientSocket.close();
-            } catch (IOException e) {
-                log.error("Errore gestione client", e);
-            }
-        }).start();
+        agentStateMachine.setState(Dto.AgentState.LEADER_ELECTION);
     }
 
     private static void sendAliveEvent(Broker broker, NodeState state){

@@ -80,4 +80,8 @@ public class NetworkGraph extends Component implements HasSize {
         getElement().executeJs("this.updateEdgeDirection($0, $1)", newHolderFrom, newHolderTo);
     }
 
+    public void fit() {
+        getElement().executeJs("this.fitGraph()");
+    }
+
 }

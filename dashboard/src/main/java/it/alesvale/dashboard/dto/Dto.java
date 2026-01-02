@@ -2,13 +2,16 @@ package it.alesvale.dashboard.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+import java.io.Serializable;
 import java.time.Instant;
 import java.util.UUID;
 
 public abstract class Dto {
 
-    public record NodeId(String nodeId, String swarmName)
-            implements Comparable<NodeId> {
+    public record SocketAddress(String hostname, int port) implements Serializable {}
+
+    public record NodeId(String nodeId, SocketAddress address)
+            implements Comparable<NodeId>, Serializable {
 
         @JsonIgnore
         public UUID getIdAsUUID(){

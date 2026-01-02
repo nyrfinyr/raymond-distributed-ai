@@ -5,16 +5,14 @@ window.initNetworkGraph = (element) => {
     const nodes = new DataSet([]);
     const edges = new DataSet([]);
 
-    // 2. Configurazione Vis.js
     const options = {
         nodes: {
             shape: 'dot',
             size: 30,
-            font: { 
-                size: 16, 
+            font: {
+                size: 16,
                 color: '#000000',
-                face: 'arial',
-                strokeWidth: 3,
+                strokeWidth: 2, // Bordo bianco al testo per leggerlo sopra le linee
                 strokeColor: '#ffffff'
             },
             borderWidth: 2,
@@ -25,29 +23,39 @@ window.initNetworkGraph = (element) => {
             color: { color: '#848484', highlight: '#848484'},
             arrows: 'to',
             smooth: {
-                type: 'cubicBezier', 
-                forceDirection: 'vertical', 
-                roundness: 0.4 
-            } 
-        },
-        physics: {
-            enabled: false 
-        },
-        layout: {
-            hierarchical: {
-                enabled: true,
-                direction: 'DU',        
-                sortMethod: 'directed', 
-                nodeSpacing: 250,
-                levelSeparation: 200,
-                
-                blockShifting: true,
-                edgeMinimization: true,
-                parentCentralization: true,
-                shakeTowards: 'roots'   
+                type: 'dynamic',
+                roundness: 0.5
             }
         },
-        interaction: { dragNodes: true, zoomView: true }
+        physics: {
+            enabled: true,
+            solver: 'barnesHut', // Solver più stabile per evitare overlapping
+            barnesHut: {
+                gravitationalConstant: -4000, // Molto negativo = forte repulsione tra nodi
+                centralGravity: 0.3,          // Tira i nodi verso il centro per non farli disperdere troppo
+                springLength: 250,            // Lunghezza ideale dei collegamenti (aumenta lo spazio)
+                springConstant: 0.04,         // Rigidità delle molle
+                damping: 0.09,                // Smorzamento per stabilizzare
+                avoidOverlap: 1               // Forza specifica anti-sovrapposizione (0 a 1)
+            },
+            stabilization: {
+                enabled: true,
+                iterations: 1000,
+                updateInterval: 50,
+                onlyDynamicEdges: false,
+                fit: true
+            },
+            adaptiveTimestep: true
+        },
+        layout: {
+            improvedLayout: true,
+            randomSeed: 42
+        },
+        interaction: {
+            dragNodes: true,
+            zoomView: true,
+            hover: true
+        }
     };
 
     const network = new Network(element, { nodes, edges }, options);
@@ -165,11 +173,13 @@ window.initNetworkGraph = (element) => {
     };
 
     element.fitGraph = () => {
-        network.fit({
-            animation: {
-                duration: 1000,
-                easingFunction: 'easeInOutQuad'
-            }
-        });
+        if (network) {
+            network.fit({
+                animation: {
+                    duration: 1000,
+                    easingFunction: 'easeInOutQuad'
+                }
+            });
+        }
     };
 };

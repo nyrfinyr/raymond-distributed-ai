@@ -3,13 +3,16 @@ package it.alesvale.node.data;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Builder;
 
+import java.io.Serializable;
 import java.time.Instant;
 import java.util.UUID;
 
 public abstract class Dto {
 
-    public record NodeId(String nodeId, String swarmName)
-            implements Comparable<NodeId> {
+    public record SocketAddress(String hostname, int port) implements Serializable{}
+
+    public record NodeId(String nodeId, SocketAddress address)
+            implements Comparable<NodeId>, Serializable {
 
         @JsonIgnore
         public UUID getIdAsUUID(){
@@ -27,9 +30,8 @@ public abstract class Dto {
         }
     }
 
-    public enum NodeStatus { IDLE, REQUESTING, CRITICAL }
-
-    public enum NodeEventType { I_AM_ALIVE, NODE_INFO }
+    public enum NodeStatus {IDLE, REQUESTING, CRITICAL}
+    public enum NodeEventType {I_AM_ALIVE, NODE_INFO}
 
     @Builder
     public record NodeEvent(NodeId nodeId,
@@ -40,4 +42,15 @@ public abstract class Dto {
                             NodeId edgeTo,
                             boolean leader) {}
 
+    public enum RaymondEventType {I_AM_CHILD}
+    @Builder
+    public record RaymondEvent(NodeId nodeId, RaymondEventType eventType)
+            implements Serializable {
+        @Override
+        public String toString(){
+            return String.format("%s-%s", nodeId.nodeId, eventType);
+        }
+    }
+
+    public enum AgentState {LEADER_ELECTION, BUILDING_SPANNING_TREE, RAYMOND_MUTUAL_EXCLUSION}
 }

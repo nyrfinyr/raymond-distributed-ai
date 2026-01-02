@@ -1,6 +1,7 @@
 package it.alesvale.dashboard.view;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.splitlayout.SplitLayout;
@@ -14,6 +15,9 @@ import org.springframework.beans.factory.annotation.Qualifier;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 @Route("")
 public class MainView extends HorizontalLayout {
@@ -23,6 +27,7 @@ public class MainView extends HorizontalLayout {
     private final LogSidePanel logSidePanel;
     private Registration eventRegistration;
     private SplitLayout splitLayout;
+    private final ScheduledExecutorService scheduler;
 
     public MainView(BrokerSubscriber subscriber,
                     ObjectMapper mapper,
@@ -31,6 +36,7 @@ public class MainView extends HorizontalLayout {
         this.graph = new NetworkGraph(mapper);
         this.subscriber = subscriber;
         this.logSidePanel = new LogSidePanel(eventLogs);
+        this.scheduler = Executors.newScheduledThreadPool(1);
         init();
     }
 
@@ -42,11 +48,12 @@ public class MainView extends HorizontalLayout {
         splitLayout = new SplitLayout(graph, logSidePanel);
         splitLayout.setOrientation(SplitLayout.Orientation.HORIZONTAL);
         splitLayout.setSizeFull();
-        splitLayout.setSplitterPosition(70);
+        splitLayout.setSplitterPosition(55);
 
         logSidePanel.setOnToggleListener(isOpen -> {
+            this.graph.fit();
             if (isOpen) {
-                splitLayout.setSplitterPosition(70);
+                splitLayout.setSplitterPosition(55);
             } else {
                 splitLayout.setSplitterPosition(97);
             }
@@ -60,6 +67,15 @@ public class MainView extends HorizontalLayout {
 
         eventRegistration = subscriber.getDispatcher(event ->
                 getUI().ifPresent(ui -> ui.access(() -> onNodeEvent(event))));
+    }
+
+    @Override
+    protected void onAttach(AttachEvent attachEvent) {
+        super.onAttach(attachEvent);
+        var ui = attachEvent.getUI();
+        scheduler.schedule(() -> {
+            ui.access(graph::fit);
+        }, 5, TimeUnit.SECONDS);
     }
 
     @Override
@@ -87,8 +103,9 @@ public class MainView extends HorizontalLayout {
     private void aliveEvent(Dto.NodeEvent event){
 
         Dto.NodeId nodeId = event.nodeId();
-        String label = nodeId.nodeId().subSequence(0, 4).toString();
-        label = event.leader() ? label + " (Root)" : label;
+        String label = event.leader()
+                ? nodeId.getHumanReadableId() + " (Root)"
+                : nodeId.getHumanReadableId();
 
         Dto.NodeData node = new Dto.NodeData(nodeId, label);
 
