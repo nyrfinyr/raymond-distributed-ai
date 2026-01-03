@@ -66,7 +66,7 @@ public class LeaderElectionService implements AgentService{
      */
     public void start() {
 
-        log.info("[{}] Starting leader election", nodeState.getId().getHumanReadableId());
+        log.info("[{}] Starting leader election", nodeState.getHumanReadableId());
         broker.publishInfoMessage(nodeState.getId(), "Starting leader election");
 
         Dispatcher d = broker.createDispatcher(msg -> handleLeaderEvent(msg, this.nodeState));
@@ -107,8 +107,8 @@ public class LeaderElectionService implements AgentService{
 
         silenceTask = debounceScheduler.schedule(() -> {
             log.info("[{}] Leader Election stabilized ({}s silence). Leader is {}",
-                    nodeState.getId().getHumanReadableId(), DEBOUNCE_TIME_S, nodeState.getLeaderId().getHumanReadableId());
-            broker.publishInfoMessage(nodeState.getId(), "Leader Election stabilized");
+                    nodeState.getHumanReadableId(), DEBOUNCE_TIME_S, nodeState.getLeaderId().getHumanReadableId());
+            broker.publishInfoMessage(nodeState.getId(), String.format("Leader Election stabilized: Leader is %s", nodeState.getLeaderId().getHumanReadableId()));
             
             if (onStabilizedCallback != null && isStable.compareAndSet(false, true)) {
                 onStabilizedCallback.run();

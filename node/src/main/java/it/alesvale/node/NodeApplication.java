@@ -26,7 +26,7 @@ public class NodeApplication {
         log.info("[{}] Socket address: {}", state.getId().getHumanReadableId(), socketAddress);
 
         ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-        scheduler.scheduleAtFixedRate(() -> sendAliveEvent(broker, state), 0, 3, TimeUnit.SECONDS);
+        scheduler.scheduleAtFixedRate(() -> sendAliveEvent(broker, state), 0, 1, TimeUnit.SECONDS);
 
         StateMachine<Dto.AgentState> agentStateMachine = new StateMachine<>();
         LeaderElectionService leaderElectionService = new LeaderElectionService(state, broker);
@@ -43,17 +43,28 @@ public class NodeApplication {
         agentStateMachine.setState(Dto.AgentState.LEADER_ELECTION);
     }
 
-    private static void sendAliveEvent(Broker broker, NodeState state){
+    private static void sendAliveEvent(Broker broker, NodeState state) {
         try {
+            Dto.NodeId edgeTarget = state.getParent();
+
+            if (state.getHolder() != null) {
+                edgeTarget = state.getHolder();
+            }
+
+            if (edgeTarget != null && edgeTarget.equals(state.getId())) {
+                edgeTarget = null;
+            }
+
             Dto.NodeEvent aliveEvent = Dto.NodeEvent.builder()
                     .nodeId(state.getId())
                     .eventType(Dto.NodeEventType.I_AM_ALIVE)
                     .status(state.getStatus())
-                    .edgeTo(state.getParent())
-                    .leader(state.isLeader())
+                    .edgeTo(edgeTarget)
+                    .holder(state.isHolder())
                     .build();
+
             broker.publishEvent(aliveEvent);
-        }catch(IOException e){
+        } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }

@@ -103,10 +103,9 @@ public class MainView extends HorizontalLayout {
     private void aliveEvent(Dto.NodeEvent event){
 
         Dto.NodeId nodeId = event.nodeId();
-        String label = event.leader()
-                ? nodeId.getHumanReadableId() + " (Root)"
+        String label = event.holder()
+                ? nodeId.getHumanReadableId() + " (PRIVILEGE)"
                 : nodeId.getHumanReadableId();
-
         Dto.NodeData node = new Dto.NodeData(nodeId, label);
 
         graph.addNode(node);

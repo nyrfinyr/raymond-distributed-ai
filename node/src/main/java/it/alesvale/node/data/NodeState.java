@@ -3,8 +3,7 @@ package it.alesvale.node.data;
 import it.alesvale.node.Utils;
 import lombok.Data;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 @Data
 public class NodeState {
@@ -14,6 +13,7 @@ public class NodeState {
     private Dto.NodeId parent;
     private Map<String, Dto.SocketAddress> childrenMap;
     private volatile Dto.NodeId leaderId;
+    private RaymondState raymondState;
 
     public NodeState(Dto.SocketAddress socketAddress) {
         this.id = new Dto.NodeId(Utils.generateNodeId(), socketAddress);
@@ -21,7 +21,74 @@ public class NodeState {
         this.parent = null;
         this.childrenMap = new HashMap<>();
         this.leaderId = this.id;
+        this.raymondState = new RaymondState(null, false, new LinkedList<>(), false);
     }
+
+    public String getHumanReadableId(){
+        return this.id.getHumanReadableId();
+    }
+
+    /* ########################################################################################## */
+    /* ########################################################################################## */
+
+    //Holder
+    public Optional<Dto.SocketAddress> getHolderAddress(){
+        return Optional.ofNullable(this.raymondState.getHolder())
+                .map(Dto.NodeId::address);
+    }
+
+    public void setHolder(Dto.NodeId nodeId){
+        this.setParent(nodeId);
+        this.raymondState.setHolder(nodeId);
+    }
+
+    public Dto.NodeId getHolder(){
+        return this.raymondState.getHolder();
+    }
+
+    public boolean isHolder(){
+        return this.id.equals(this.raymondState.getHolder());
+    }
+
+    /* ########################################################################################## */
+    /* ########################################################################################## */
+
+    //Using
+    public void setUsing(boolean using){
+        this.raymondState.setUsing(using);
+    }
+
+    public boolean isUsing(){
+        return this.raymondState.isUsing();
+    }
+
+    /* ########################################################################################## */
+    /* ########################################################################################## */
+
+    //Request queue
+    public boolean isQueueEmpty(){
+        return this.raymondState.getRequestQueue().isEmpty();
+    }
+    public Dto.NodeId dequeueRequest(){
+        return this.raymondState.getRequestQueue().remove();
+    }
+    public void enqueueRequest(Dto.NodeId nodeId){
+        this.raymondState.getRequestQueue().add(nodeId);
+    }
+
+    /* ########################################################################################## */
+    /* ########################################################################################## */
+
+    //Asked
+    public boolean hasAlreadyAsked(){
+        return this.raymondState.isAsked();
+    }
+    public void setAsked(boolean asked){
+        this.raymondState.setAsked(asked);
+    }
+
+    /* ########################################################################################## */
+    /* ########################################################################################## */
 
     public void addChildren(Dto.NodeId nodeId){
         childrenMap.put(nodeId.nodeId(), nodeId.address());

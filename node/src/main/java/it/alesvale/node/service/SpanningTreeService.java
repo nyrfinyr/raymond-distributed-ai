@@ -49,7 +49,7 @@ public class SpanningTreeService implements AgentService {
 
     public void start(){
         try {
-            log.info("[{}] Starting spanning tree service", nodeState.getId().getHumanReadableId());
+            log.info("[{}] Starting spanning tree service", nodeState.getHumanReadableId());
 
             broker.publishInfoMessage(nodeState.getId(), "Starting building Spanning Tree");
 
@@ -68,7 +68,7 @@ public class SpanningTreeService implements AgentService {
     }
 
     private void startLeaderLogic() {
-        log.info("[{}] I'm LEADER. Starting discovery...", nodeState.getId().getHumanReadableId());
+        log.info("[{}] I'm LEADER. Starting discovery...", nodeState.getHumanReadableId());
 
         startBroadcastingIdentity();
 
@@ -82,7 +82,7 @@ public class SpanningTreeService implements AgentService {
         this.announceDispatcher = broker.createDispatcher(this::handleParentAnnouncement);
         this.announceDispatcher.subscribe(SUBJECT_ANNOUNCE, "orphans");
 
-        log.info("[{}] I am an orphan, waiting in queue...", nodeState.getId().getHumanReadableId());
+        log.info("[{}] I am an orphan, waiting in queue...", nodeState.getHumanReadableId());
     }
 
     private void resetStabilizationTimer() {
@@ -108,7 +108,7 @@ public class SpanningTreeService implements AgentService {
                 return;
 
             log.info("[{}] Adopted by parent: {}",
-                    nodeState.getId().getHumanReadableId(), potentialParentId.getHumanReadableId());
+                    nodeState.getHumanReadableId(), potentialParentId.getHumanReadableId());
 
             nodeState.setParent(potentialParentId);
 
@@ -137,7 +137,7 @@ public class SpanningTreeService implements AgentService {
 
     private void handleStabilization() {
         log.info("[{}] Spanning Tree stabilized ({}s silence)",
-                nodeState.getId().getHumanReadableId(), STABILIZATION_TIMEOUT);
+                nodeState.getHumanReadableId(), STABILIZATION_TIMEOUT);
 
         broker.publishInfoMessage(nodeState.getId(), "Spanning Tree stabilized");
 

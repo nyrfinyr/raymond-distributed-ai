@@ -70,7 +70,7 @@ public class NetworkGraph extends Component implements HasSize {
     public void updateNodeStatus(Dto.NodeId nodeId, Dto.NodeStatus status) {
         String color = switch (status) {
             case IDLE -> "#97C2FC";        // Blu chiaro
-            case REQUESTING -> "#FFD700";  // Oro/Giallo
+            case REQUESTING -> "#FFD700";  // Oro-Giallo
             case CRITICAL -> "#FF4500";    // Rosso
         };
         getElement().executeJs("this.updateNodeColor($0, $1)", nodeId.nodeId(), color);

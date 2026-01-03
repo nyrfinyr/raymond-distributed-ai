@@ -40,9 +40,9 @@ public abstract class Dto {
                             Instant timestamp,
                             NodeStatus status,
                             NodeId edgeTo,
-                            boolean leader) {}
+                            boolean holder) {}
 
-    public enum RaymondEventType {I_AM_CHILD}
+    public enum RaymondEventType {I_AM_CHILD, REQUEST, PRIVILEGE}
     @Builder
     public record RaymondEvent(NodeId nodeId, RaymondEventType eventType)
             implements Serializable {

@@ -43,6 +43,6 @@ public abstract class Dto {
                             String message,
                             NodeStatus status,
                             NodeId edgeTo,
-                            boolean leader) {
+                            boolean holder) {
     }
 }
