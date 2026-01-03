@@ -7,11 +7,12 @@ import it.alesvale.node.data.StateMachine;
 import it.alesvale.node.service.*;
 import lombok.extern.slf4j.Slf4j;
 
-import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+
+import static it.alesvale.node.service.DashboardUpdateUtils.sendAliveEvent;
 
 @Slf4j
 public class NodeApplication {
@@ -42,31 +43,4 @@ public class NodeApplication {
 
         agentStateMachine.setState(Dto.AgentState.LEADER_ELECTION);
     }
-
-    private static void sendAliveEvent(Broker broker, NodeState state) {
-        try {
-            Dto.NodeId edgeTarget = state.getParent();
-
-            if (state.getHolder() != null) {
-                edgeTarget = state.getHolder();
-            }
-
-            if (edgeTarget != null && edgeTarget.equals(state.getId())) {
-                edgeTarget = null;
-            }
-
-            Dto.NodeEvent aliveEvent = Dto.NodeEvent.builder()
-                    .nodeId(state.getId())
-                    .eventType(Dto.NodeEventType.I_AM_ALIVE)
-                    .status(state.getStatus())
-                    .edgeTo(edgeTarget)
-                    .holder(state.isHolder())
-                    .build();
-
-            broker.publishEvent(aliveEvent);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
 }

@@ -38,18 +38,15 @@ public class RaymondService implements AgentService{
         } else {
             // Non-leaders point holder toward parent [cite: 358]
             this.nodeState.getRaymondState().setHolder(this.nodeState.getParent());
-            sendIAmChildEvent();
         }
 
-        // Start the simulation loop in a separate thread so it doesn't block the receiver or main thread
         new Thread(this::loop).start();
     }
 
     private void loop() {
         while (running) {
             try {
-                // 1. Simulate work outside Critical Section
-                long waitTime = 10000 + random.nextInt(10000);
+                long waitTime = 20000 + random.nextInt(20000); // 20-40 seconds
                 log.info("[{}] Working outside CS for {}ms...", nodeState.getHumanReadableId(), waitTime);
                 Thread.sleep(waitTime);
 
@@ -60,7 +57,7 @@ public class RaymondService implements AgentService{
                 // 3. Wait until granted
                 synchronized (nodeState) {
                     while (nodeState.getStatus() != Dto.NodeStatus.CRITICAL) {
-                        nodeState.wait(); // Wait for notification from ASSIGN_PRIVILEGE
+                        nodeState.wait();
                     }
                 }
 
@@ -68,8 +65,8 @@ public class RaymondService implements AgentService{
                 log.info("[{}] >>> ENTERING CRITICAL SECTION <<<", nodeState.getHumanReadableId());
                 broker.publishInfoMessage(nodeState.getId(), "EXECUTING CRITICAL SECTION");
 
-                // Simulate CS work
-                Thread.sleep(15000 + random.nextInt(3000));
+                // 2-4 seconds in CS
+                Thread.sleep(2000 + random.nextInt(2000));
 
                 // 5. Exit Critical Section [cite: 155]
                 log.info("[{}] <<< EXITING CRITICAL SECTION >>>", nodeState.getHumanReadableId());
@@ -85,25 +82,9 @@ public class RaymondService implements AgentService{
         }
     }
 
-    private synchronized void sendIAmChildEvent(){
-        try {
-            Dto.RaymondEvent raymondEvent = Dto.RaymondEvent.builder()
-                    .nodeId(nodeState.getId())
-                    .eventType(Dto.RaymondEventType.I_AM_CHILD)
-                    .build();
-            socketManager.send(raymondEvent, nodeState.getParent().address());
-            broker.publishInfoMessage(nodeState.getId(),
-                    String.format("I_AM_CHILD sent to %s", nodeState.getParent().getHumanReadableId()));
-            log.info("[{}] I_AM_CHILD event sent", nodeState.getHumanReadableId());
-        }catch(Exception e){
-            log.error("[{}] Error during send child event: ",nodeState.getHumanReadableId(), e);
-        }
-    }
-
     private synchronized void askForCriticalSection(){
         // Event: The node wishes to enter the critical section [cite: 143]
         this.nodeState.enqueueRequest(nodeState.getId());
-
         this.nodeState.setStatus(Dto.NodeStatus.REQUESTING);
         ASSIGN_PRIVILEGE();
         MAKE_REQUEST();
@@ -119,15 +100,8 @@ public class RaymondService implements AgentService{
 
     private synchronized void ASSIGN_PRIVILEGE(){
         // Preconditions
-        if(!nodeState.isHolder()){
+        if(!nodeState.isHolder() || nodeState.isUsing() || nodeState.isQueueEmpty())
             return;
-        }
-        if(nodeState.isUsing()){
-            return;
-        }
-        if(nodeState.isQueueEmpty()){
-            return;
-        }
 
         // Logic [cite: 116, 117]
         Dto.NodeId headRequest = nodeState.dequeueRequest();
@@ -140,15 +114,17 @@ public class RaymondService implements AgentService{
             nodeState.setStatus(Dto.NodeStatus.CRITICAL);
             broker.publishInfoMessage(nodeState.getId(), "PRIVILEGE ACQUIRED: ENTERING CS");
 
-            // Notify the loop thread that we are now Critical
             synchronized (nodeState) {
                 nodeState.notifyAll();
             }
             return;
         }
 
+        // Visualization purposes
+        DashboardUpdateUtils.sendAliveEvent(broker, nodeState);
+
         Dto.RaymondEvent raymondEvent = Dto.RaymondEvent.builder()
-                .nodeId(nodeState.getId()) // Sender ID
+                .nodeId(nodeState.getId())
                 .eventType(Dto.RaymondEventType.PRIVILEGE)
                 .build();
 
@@ -162,15 +138,8 @@ public class RaymondService implements AgentService{
 
     private synchronized void MAKE_REQUEST(){
         // Preconditions
-        if(nodeState.isHolder()){
+        if(nodeState.isHolder() || nodeState.isQueueEmpty() || nodeState.hasAlreadyAsked())
             return;
-        }
-        if(nodeState.isQueueEmpty()){
-            return;
-        }
-        if(nodeState.hasAlreadyAsked()) {
-            return;
-        }
 
         // Logic [cite: 135]
         Dto.RaymondEvent raymondEvent = Dto.RaymondEvent.builder()
@@ -190,18 +159,9 @@ public class RaymondService implements AgentService{
 
     private synchronized void onRaymondEvent(Dto.RaymondEvent raymondEvent){
         switch(raymondEvent.eventType()){
-            case I_AM_CHILD -> onChildEvent(raymondEvent);
             case REQUEST -> onRequestEvent(raymondEvent);
-            case PRIVILEGE -> onPrivilegeEvent(raymondEvent);
+            case PRIVILEGE -> onPrivilegeEvent();
         }
-    }
-
-    private synchronized void onChildEvent(Dto.RaymondEvent raymondEvent){
-        nodeState.addChildren(raymondEvent.nodeId());
-        log.info("[{}] Child added: {}",
-                nodeState.getHumanReadableId(), raymondEvent.nodeId());
-        broker.publishInfoMessage(nodeState.getId(),
-                String.format("Child added: %s", raymondEvent.nodeId().getHumanReadableId()));
     }
 
     private synchronized void onRequestEvent(Dto.RaymondEvent raymondEvent){
@@ -211,10 +171,22 @@ public class RaymondService implements AgentService{
         MAKE_REQUEST();
     }
 
-    private synchronized void onPrivilegeEvent(Dto.RaymondEvent raymondEvent){
-        // Event: The node receives a PRIVILEGE message [cite: 151, 152]
+    private synchronized void onPrivilegeEvent(){
         this.nodeState.setHolder(nodeState.getId());
+
+        DashboardUpdateUtils.sendAliveEvent(broker, nodeState);
+        waitASecond();
+
         ASSIGN_PRIVILEGE();
         MAKE_REQUEST();
     }
+
+    private void waitASecond(){
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
 }

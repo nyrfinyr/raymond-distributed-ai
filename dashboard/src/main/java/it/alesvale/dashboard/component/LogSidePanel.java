@@ -35,7 +35,6 @@ public class LogSidePanel extends VerticalLayout {
         setPadding(false);
         setSpacing(false);
 
-        // Inizializzazione dati e griglia
         this.eventGrid = new Grid<>();
         this.dataProvider = new ListDataProvider<>(eventLog);
         eventGrid.setDataProvider(dataProvider);
@@ -55,11 +54,12 @@ public class LogSidePanel extends VerticalLayout {
                 .setHeader("Message").setResizable(true).setWidth("60%").setFlexGrow(6);
         eventGrid.setSizeFull();
 
-        // Configurazione Search Field
         searchField = new TextField();
         searchField.setPlaceholder("Filtra per nodo");
         searchField.setValueChangeMode(ValueChangeMode.LAZY);
         searchField.setWidthFull();
+        searchField.setClearButtonVisible(true);
+        searchField.setPrefixComponent(VaadinIcon.SEARCH.create());
         searchField.addValueChangeListener(e -> {
             dataProvider.setFilter(event -> {
                 String filterText = e.getValue();
@@ -68,7 +68,6 @@ public class LogSidePanel extends VerticalLayout {
             });
         });
 
-        // Configurazione Toggle Button
         toggleButton = new Button(VaadinIcon.ANGLE_DOUBLE_RIGHT.create());
         toggleButton.addClickListener(e -> toggleSidePanel());
 
@@ -85,11 +84,11 @@ public class LogSidePanel extends VerticalLayout {
 
     public void addEvent(Dto.NodeEvent event) {
         eventLog.add(0, event);
-        
+
         if (eventLog.size() > 1000) {
             eventLog.remove(eventLog.size() - 1);
         }
-        
+
         dataProvider.refreshAll();
     }
 
@@ -120,7 +119,7 @@ public class LogSidePanel extends VerticalLayout {
         isPanelOpen = false;
         searchField.setVisible(false);
         eventGrid.setVisible(false);
-        
+
         toggleButton.setIcon(VaadinIcon.ANGLE_DOUBLE_LEFT.create());
     }
 
@@ -128,7 +127,7 @@ public class LogSidePanel extends VerticalLayout {
         isPanelOpen = true;
         searchField.setVisible(true);
         eventGrid.setVisible(true);
-        
+
         toggleButton.setIcon(VaadinIcon.ANGLE_DOUBLE_RIGHT.create());
     }
 }

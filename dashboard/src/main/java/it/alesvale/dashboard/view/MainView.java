@@ -3,12 +3,14 @@ package it.alesvale.dashboard.view;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.DetachEvent;
+import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.splitlayout.SplitLayout;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.shared.Registration;
 import it.alesvale.dashboard.backend.BrokerSubscriber;
 import it.alesvale.dashboard.component.LogSidePanel;
+import it.alesvale.dashboard.component.StatusLegend;
 import it.alesvale.dashboard.dto.Dto;
 import it.alesvale.dashboard.frontendlib.NetworkGraph;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -45,7 +47,20 @@ public class MainView extends HorizontalLayout {
         setPadding(false);
         setSpacing(false);
 
-        splitLayout = new SplitLayout(graph, logSidePanel);
+        Div graphWrapper = new Div();
+        graphWrapper.setSizeFull();
+        graphWrapper.getStyle().set("position", "relative"); // Contesto per il posizionamento assoluto
+        graphWrapper.getStyle().set("overflow", "hidden");   // Evita scrollbar se il grafo sborda
+
+        StatusLegend legend = new StatusLegend();
+        legend.getStyle().set("position", "absolute");
+        legend.getStyle().set("top", "20px");
+        legend.getStyle().set("left", "20px");
+        legend.getStyle().set("z-index", "10");
+
+        graphWrapper.add(graph, legend);
+
+        splitLayout = new SplitLayout(graphWrapper, logSidePanel);
         splitLayout.setOrientation(SplitLayout.Orientation.HORIZONTAL);
         splitLayout.setSizeFull();
         splitLayout.setSplitterPosition(55);

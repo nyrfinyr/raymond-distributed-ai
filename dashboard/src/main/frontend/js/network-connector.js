@@ -12,11 +12,19 @@ window.initNetworkGraph = (element) => {
             font: {
                 size: 16,
                 color: '#000000',
-                strokeWidth: 2, // Bordo bianco al testo per leggerlo sopra le linee
+                strokeWidth: 2,
                 strokeColor: '#ffffff'
             },
             borderWidth: 2,
-            shadow: true
+            shadow: true,
+            color: {
+                background: '#97C2FC',
+                border: '#2B7CE9',
+                highlight: {
+                    background: '#97C2FC',
+                    border: '#2B7CE9'
+                }
+            }
         },
         edges: {
             width: 2,
@@ -29,14 +37,14 @@ window.initNetworkGraph = (element) => {
         },
         physics: {
             enabled: true,
-            solver: 'barnesHut', // Solver più stabile per evitare overlapping
+            solver: 'barnesHut',
             barnesHut: {
-                gravitationalConstant: -4000, // Molto negativo = forte repulsione tra nodi
-                centralGravity: 0.3,          // Tira i nodi verso il centro per non farli disperdere troppo
-                springLength: 250,            // Lunghezza ideale dei collegamenti (aumenta lo spazio)
-                springConstant: 0.04,         // Rigidità delle molle
-                damping: 0.09,                // Smorzamento per stabilizzare
-                avoidOverlap: 1               // Forza specifica anti-sovrapposizione (0 a 1)
+                gravitationalConstant: -4000,
+                centralGravity: 0.3,
+                springLength: 250,
+                springConstant: 0.04,
+                damping: 0.09,
+                avoidOverlap: 1
             },
             stabilization: {
                 enabled: true,
@@ -60,27 +68,22 @@ window.initNetworkGraph = (element) => {
 
     const network = new Network(element, { nodes, edges }, options);
 
-    // Helper per convertire il DTO Java (nested) nel formato piatto di Vis.js
-    // Java NodeData: { nodeId: { nodeId: "1" }, label: "A" } -> Vis: { id: "1", label: "A" }
     const mapNode = (rawNode) => {
         return {
             ...rawNode,
-            id: rawNode.nodeId.nodeId, // Mappa nodeId.nodeId -> id
+            id: rawNode.nodeId.nodeId,
             label: rawNode.label
         };
     };
 
-    // Helper per gli Edge
-    // Java EdgeData: { from: { nodeId: "1" }, to: { nodeId: "2" } } -> Vis: { from: "1", to: "2" }
     const mapEdge = (rawEdge) => {
         return {
             ...rawEdge,
-            from: rawEdge.from.nodeId, // Estrai la stringa dall'oggetto
-            to: rawEdge.to.nodeId      // Estrai la stringa dall'oggetto
+            from: rawEdge.from.nodeId,
+            to: rawEdge.to.nodeId
         };
     };
 
-    // Event listener per il click sui nodi
     network.on('click', function(params) {
         if (params.nodes.length > 0) {
             const nodeId = params.nodes[0];
@@ -110,7 +113,6 @@ window.initNetworkGraph = (element) => {
         } else {
             nodes.add(newNode);
         }
-        //network.fit();
     }
 
     element.addEdge = (edgeJson) => {
@@ -142,34 +144,20 @@ window.initNetworkGraph = (element) => {
 
     element.updateNodeColor = (nodeId, colorCode) => {
         try {
-            nodes.update({ id: nodeId, color: { background: colorCode } });
+            nodes.update({
+                id: nodeId,
+                color: {
+                    background: colorCode,
+                    highlight: {
+                        background: colorCode,
+                        border: '#2B7CE9'
+                    },
+                    hover: {
+                        background: colorCode
+                    }
+                }
+            });
         } catch (e) { console.error("Errore update nodo", e); }
-    };
-
-    element.updateEdgeDirection = (fromId, toId) => {
-
-        const existingCorrect = edges.get({
-            filter: function (item) {
-                return item.from === fromId && item.to === toId;
-            }
-        });
-
-        if (existingCorrect.length > 0) {
-            return;
-        }
-
-        const existingReverse = edges.get({
-            filter: function (item) {
-                return item.from === toId && item.to === fromId;
-            }
-        });
-
-        if (existingReverse.length > 0) {
-            edges.remove(existingReverse[0].id);
-            edges.add({ from: fromId, to: toId });
-        } else {
-            edges.add({ from: fromId, to: toId });
-        }
     };
 
     element.fitGraph = () => {

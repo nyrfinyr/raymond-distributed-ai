@@ -42,7 +42,7 @@ public abstract class Dto {
                             NodeId edgeTo,
                             boolean holder) {}
 
-    public enum RaymondEventType {I_AM_CHILD, REQUEST, PRIVILEGE}
+    public enum RaymondEventType {REQUEST, PRIVILEGE}
     @Builder
     public record RaymondEvent(NodeId nodeId, RaymondEventType eventType)
             implements Serializable {

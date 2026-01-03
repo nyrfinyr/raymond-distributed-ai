@@ -11,7 +11,6 @@ public class NodeState {
     private final Dto.NodeId id;
     private Dto.NodeStatus status;
     private Dto.NodeId parent;
-    private Map<String, Dto.SocketAddress> childrenMap;
     private volatile Dto.NodeId leaderId;
     private RaymondState raymondState;
 
@@ -19,7 +18,6 @@ public class NodeState {
         this.id = new Dto.NodeId(Utils.generateNodeId(), socketAddress);
         this.status = Dto.NodeStatus.IDLE;
         this.parent = null;
-        this.childrenMap = new HashMap<>();
         this.leaderId = this.id;
         this.raymondState = new RaymondState(null, false, new LinkedList<>(), false);
     }
@@ -89,14 +87,6 @@ public class NodeState {
 
     /* ########################################################################################## */
     /* ########################################################################################## */
-
-    public void addChildren(Dto.NodeId nodeId){
-        childrenMap.put(nodeId.nodeId(), nodeId.address());
-    }
-
-    public Dto.SocketAddress getChildrenAddress(Dto.NodeId nodeId){
-        return childrenMap.get(nodeId.nodeId());
-    }
 
     public boolean isLeader(){
         return this.leaderId.nodeId().equals(this.id.nodeId());
