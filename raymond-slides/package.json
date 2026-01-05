@@ -1,0 +1,14 @@
+{
+  "name": "raymond-slides",
+  "private": true,
+  "scripts": {
+    "dev": "slidev",
+    "build": "slidev build --base /raymond-distributed-ai/",
+    "export": "slidev export"
+  },
+  "dependencies": {
+    "@slidev/cli": "^52.11.1",
+    "@slidev/theme-default": "^0.25.0",
+    "@slidev/theme-seriph": "^0.25.0"
+  }
+}

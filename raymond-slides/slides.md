@@ -484,7 +484,7 @@ private synchronized void exitFromCriticalSection(){
 # Real-Time Dashboard: Network Graph
 
 <div class="flex justify-center">
-  <img src="./images/raymond_image.png" class="h-96 rounded shadow-lg" />
+  <img src="/raymond_image.png" class="h-96 rounded shadow-lg" />
 </div>
 
 <div class="mt-2 text-center text-sm text-gray-400">
@@ -496,7 +496,7 @@ Node colors: <span class="text-blue-400">IDLE</span> | <span class="text-yellow-
 # Real-Time Dashboard: Event Log
 
 <div class="flex justify-center">
-  <img src="./images/logs.png" class="h-96 rounded shadow-lg" />
+  <img src="/logs.png" class="h-96 rounded shadow-lg" />
 </div>
 
 <div class="mt-2 text-center text-sm text-gray-400">
