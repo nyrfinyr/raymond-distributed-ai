@@ -1,0 +1,61 @@
+{
+  "name": "Raymond Distributed AI",
+
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+
+  "features": {
+    // Java 21 for Gradle modules (node, dashboard)
+    "ghcr.io/devcontainers/features/java:1": {
+      "version": "21",
+      "installGradle": "true",
+      "gradleVersion": "8.5"
+    },
+    // Node.js 20 for Slidev
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
+    },
+    // Docker-in-Docker for Swarm
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest",
+      "enableNonRootDocker": "true",
+      "moby": "true"
+    }
+  },
+
+  // Port forwarding
+  "forwardPorts": [
+    8091,  // Dashboard (Spring Boot)
+    8080,  // Dashboard internal
+    8222,  // NATS monitoring
+    4222,  // NATS
+    3030   // Slidev dev server
+  ],
+
+  "portsAttributes": {
+    "8091": { "label": "Dashboard", "onAutoForward": "notify" },
+    "8222": { "label": "NATS Monitor", "onAutoForward": "silent" },
+    "3030": { "label": "Slidev", "onAutoForward": "notify" }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-azuretools.vscode-docker",
+        "vscjava.vscode-java-pack",
+        "vscjava.vscode-gradle",
+        "redhat.vscode-yaml",
+        "antfu.slidev"
+      ],
+      "settings": {
+        "java.configuration.updateBuildConfiguration": "automatic",
+        "java.compile.nullAnalysis.mode": "automatic"
+      }
+    }
+  },
+
+  // Initialize Swarm and install Slidev dependencies
+  "postCreateCommand": "docker swarm init && cd raymond-slides && npm install",
+
+  // Run as non-root user
+  "remoteUser": "vscode"
+}
