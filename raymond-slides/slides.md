@@ -613,6 +613,6 @@ class: text-center
 
 <div class="mt-8">
 
-Repository: [github.com/alesvale/raymond-distributed-ai](https://github.com/nyrfinyr/raymond-distributed-ai)
+Repository: [github.com/nyrfinyr/raymond-distributed-ai](https://github.com/nyrfinyr/raymond-distributed-ai)
 
 </div>
