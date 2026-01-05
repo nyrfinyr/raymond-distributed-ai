@@ -1,95 +1,283 @@
-# Distributed Mutual Exclusion: Raymond's Tree-Based Algorithm
+# Raymond Distributed AI
 
-## 📌 Introduzione
-Questo repository ospita il progetto finale per il corso di **Distributed Artificial Intelligence**.
-Il progetto consiste nell'implementazione distribuita e nella visualizzazione grafica dell'**Algoritmo di Raymond (1989)** per la mutua esclusione in sistemi distribuiti.
+Implementazione dell'algoritmo di **mutua esclusione distribuita di Raymond** con visualizzazione real-time tramite dashboard web.
 
-A differenza degli algoritmi classici basati su topologie ad anello (Token Ring) o su grafo completo (Ricart & Agrawala), l'algoritmo di Raymond organizza i nodi in una topologia ad **albero logico**, permettendo di ottenere una complessità media di messaggi pari a $O(\log N)$.
+## Stack Tecnologico
 
-L'applicazione è containerizzata tramite **Docker** e prevede un'interfaccia di visualizzazione dinamica a grafo realizzata in **Vaadin**, che funge da "Osservatore" dello stato globale del sistema.
+### Backend
+| Tecnologia | Versione | Utilizzo |
+|------------|----------|----------|
+| Java | 21 | Linguaggio principale |
+| Spring Boot | 4.0.1 | Framework web (Dashboard) |
+| Vaadin | 25.0.0 | UI framework con server-push |
+| NATS | Alpine | Message broker pub/sub |
+| Jackson | 2.18.2 | Serializzazione JSON |
+| Lombok | 1.18.36 | Riduzione boilerplate |
+| Gradle | 8.5+ | Build automation |
 
----
+### Frontend
+| Tecnologia | Versione | Utilizzo |
+|------------|----------|----------|
+| React | 19.x | Component framework |
+| TypeScript | 5.9.x | Typed JavaScript |
+| Vis.js Network | 9.1.9 | Visualizzazione grafi |
+| Vite | 7.3.x | Build tool |
 
-## 🧠 Cenni Teorici: L'Algoritmo di Raymond
+### DevOps
+| Tecnologia | Utilizzo |
+|------------|----------|
+| Docker | Containerizzazione |
+| Docker Swarm | Orchestrazione cluster |
+| Alpine Linux | Base image leggera |
 
-L'algoritmo K. Raymond utilizza una struttura ad albero (Spanning Tree) per gestire il passaggio di un **Token** (privilegio) che garantisce l'accesso alla Sezione Critica (CS).
+## Architettura
 
-### Concetti Chiave
-1.  **Topologia Logica:** I nodi sono organizzati in un albero. Ogni nodo comunica solo con il proprio genitore e i propri figli diretti.
-2.  **Holder (Puntatore al Token):** Ogni nodo mantiene una variabile `holder` che punta verso il vicino (genitore o figlio) che si trova lungo il percorso verso il Token (o che possiede il Token stesso). Le frecce del grafo visualizzato rappresentano proprio questa variabile: **tutte le frecce puntano verso la radice corrente (il detentore del Token).**
-3.  **Request Queue:** Ogni nodo possiede una coda FIFO locale dove memorizza le richieste di accesso alla CS (proprie o dei figli).
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         Docker Swarm                            │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────┐    ┌─────────────────────────────────────┐     │
+│  │    NATS     │◄───│           Dashboard                 │     │
+│  │   Broker    │    │  (Spring Boot + Vaadin + Vis.js)    │     │
+│  │  :4222      │    │            :8080                    │     │
+│  └──────┬──────┘    └─────────────────────────────────────┘     │
+│         │                                                       │
+│         │ pub/sub                                               │
+│         │                                                       │
+│  ┌──────┴──────────────────────────────────────────────┐        │
+│  │                                                      │       │
+│  │  ┌────────┐  ┌────────┐  ┌────────┐    ┌────────┐  │         │
+│  │  │ Node 1 │  │ Node 2 │  │ Node 3 │ .. │ Node N │  │         │
+│  │  └───┬────┘  └───┬────┘  └───┬────┘    └───┬────┘  │         │
+│  │      │           │           │              │       │        │
+│  │      └───────────┴─────┬─────┴──────────────┘       │        │
+│  │                        │                            │        │
+│  │              Socket P2P (TCP)                       │        │
+│  │         (Raymond REQUEST/PRIVILEGE)                 │        │
+│  └─────────────────────────────────────────────────────┘        │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-### Funzionamento
-Il flusso di una richiesta avviene in due fasi:
+### Comunicazione
+- **NATS Broker**: Comunicazione pub/sub per eventi di sistema (leader election, spanning tree, dashboard updates)
+- **Socket TCP P2P**: Comunicazione diretta tra nodi per messaggi Raymond (REQUEST/PRIVILEGE)
+- **WebSocket (Vaadin Push)**: Aggiornamenti real-time dalla dashboard al browser
 
-1.  **Fase di Richiesta (Salita):**
-    * Quando un nodo vuole accedere alla CS, aggiunge se stesso alla propria coda.
-    * Se la coda era vuota, invia un messaggio `REQUEST` al suo `holder`.
-    * Il messaggio risale l'albero fino a raggiungere il nodo che possiede il Token (la radice).
+## Servizi Implementati
 
-2.  **Fase di Concessione (Discesa del Token):**
-    * Il nodo radice, appena possibile, cede il Token al vicino che ha fatto richiesta.
-    * **Riorientamento Dinamico:** Quando il Token passa dal nodo A al nodo B, la variabile `holder` di A viene aggiornata per puntare a B. Di conseguenza, **la topologia dell'albero cambia**: B diventa la nuova radice.
-    * Il Token scende lungo il percorso fino al nodo richiedente originale, che entra in Sezione Critica.
+Il sistema esegue tre fasi in sequenza, gestite da una **State Machine**:
 
----
+### 1. Leader Election Service
 
-## 🏗️ Architettura del Sistema
+**Algoritmo**: Gossip-based con strategia "Min-ID wins"
 
-Il sistema è un'applicazione distribuita reale, dove ogni nodo è un processo isolato che non condivide memoria con gli altri.
+**Funzionamento**:
+1. Ogni nodo pubblica il proprio ID sul topic `leader-election`
+2. Alla ricezione di un messaggio, confronta l'ID ricevuto con quello del leader corrente
+3. Se l'ID ricevuto è minore, aggiorna il leader e propaga l'informazione
+4. Stabilizzazione dopo 20 secondi di silenzio
 
-### Stack Tecnologico
-* **Linguaggio:** Java 17+
-* **Framework Middleware:** Spring Boot (Web, Actuator)
-* **Frontend / Visualizer:** Vaadin Flow + Vis.js (per la visualizzazione a grafo)
-* **Containerization:** Docker & Docker Compose
-* **Build Tool:** Maven
+**Topic NATS**: `leader-election`
 
-### Componenti
-1.  **Distributed Node (Microservizio):** * Espone API REST per lo scambio di messaggi (`POST /api/request`, `POST /token`).
-    * Implementa la logica stateful di Raymond (gestione coda FIFO e puntatori).
-    * Esegue un thread separato per simulare il lavoro nella Sezione Critica.
-2.  **Observer Dashboard (Vaadin):**
-    * Interroga periodicamente i nodi (Polling o Push) per ottenere lo stato corrente (`holder`, `queue`, `status`).
-    * Renderizza la topologia dinamica:
-        * **Nodi Verdi:** Idle
-        * **Nodi Gialli:** In attesa (Request inviata)
-        * **Nodi Rossi:** In Sezione Critica (Token posseduto)
-    * Mostra gli archi direzionati in base alla variabile `holder`.
+```java
+// Il nodo con ID più piccolo diventa leader
+if (proposedLeaderId.compareTo(currentLeaderId) < 0) {
+    nodeState.setLeaderId(proposedLeaderId);
+    broker.publishId(nodeState.getLeaderId(), "leader-election");
+}
+```
 
----
+### 2. Spanning Tree Service
 
-## 🚀 Guida all'Esecuzione
+**Algoritmo**: Costruzione incrementale con adozione parent-child
+
+**Funzionamento**:
+1. Il leader inizia a fare broadcast della propria identità
+2. I nodi orfani ascoltano sul topic `spanning-tree.announce` (con queue group)
+3. Quando un orfano riceve un annuncio, adotta il mittente come parent
+4. Il nuovo nodo inizia a sua volta il broadcast per adottare altri orfani
+5. Stabilizzazione dopo 20 secondi senza nuovi join
+
+**Topic NATS**:
+- `spanning-tree.announce` - Annunci per adozione
+- `spanning-tree.joined` - Notifica di join (reset timer stabilizzazione)
+- `spanning-tree.stabilized` - Broadcast fine costruzione
+
+### 3. Raymond Mutual Exclusion Service
+
+**Algoritmo**: Raymond's Tree-Based Algorithm (token-based)
+
+**Concetti chiave**:
+- **HOLDER**: Puntatore al nodo che detiene (o conosce la direzione del) privilegio
+- **USING**: Flag che indica se il nodo sta usando la sezione critica
+- **REQUEST_Q**: Coda delle richieste pendenti
+- **ASKED**: Flag per evitare richieste duplicate
+
+**Procedure principali**:
+
+```java
+ASSIGN_PRIVILEGE():
+    // Precondizioni: holder && !using && !queue.isEmpty
+    // Passa il privilegio al primo della coda
+
+MAKE_REQUEST():
+    // Precondizioni: !holder && !queue.isEmpty && !asked
+    // Invia REQUEST verso il holder
+```
+
+**Eventi gestiti**:
+- `REQUEST`: Ricezione richiesta da un vicino -> accoda e chiama ASSIGN_PRIVILEGE + MAKE_REQUEST
+- `PRIVILEGE`: Ricezione del token -> diventa holder e chiama ASSIGN_PRIVILEGE + MAKE_REQUEST
+
+**Comunicazione**: Socket TCP diretti tra nodi (non NATS)
+
+### Ciclo di vita del nodo
+
+```
+┌──────────────────┐     stabilized     ┌─────────────────────┐
+│  LEADER_ELECTION │ ─────────────────► │ BUILDING_SPANNING   │
+│                  │                    │       TREE          │
+└──────────────────┘                    └──────────┬──────────┘
+                                                   │
+                                        stabilized │
+                                                   ▼
+                                        ┌─────────────────────┐
+                                        │ RAYMOND_MUTUAL      │
+                                        │    EXCLUSION        │
+                                        └─────────────────────┘
+```
+
+## Dashboard
+
+La dashboard visualizza in real-time:
+- **Grafo della rete**: Nodi e connessioni dello spanning tree
+- **Stato dei nodi**: IDLE (grigio), REQUESTING (giallo), CRITICAL (verde)
+- **Holder del privilegio**: Evidenziato visivamente
+- **Log eventi**: Panel laterale con filtri per tipo evento
+
+**Tecnologie**:
+- Vaadin con `@Push` per aggiornamenti WebSocket
+- Vis.js Network per rendering del grafo con fisica
+- Sottoscrizione NATS per ricevere eventi dai nodi
+
+## Avvio con Docker Swarm
 
 ### Prerequisiti
-* Docker & Docker Compose installati sulla macchina.
-* Porte 8080-808X libere.
+- Docker Engine con Swarm mode
+- Docker Compose v2
 
-### Avvio Rapido
-1.  Clonare il repository:
-    ```bash
-    git clone [https://github.com/tuo-user/raymond-algorithm-visualizer.git](https://github.com/tuo-user/raymond-algorithm-visualizer.git)
-    cd raymond-algorithm-visualizer
-    ```
+### Comandi
 
-2.  Build del progetto (genera il .jar):
-    ```bash
-    mvn clean package -Pproduction
-    ```
+```bash
+# 1. Inizializza Docker Swarm (se non già fatto)
+docker swarm init
 
-3.  Avvio dell'infrastruttura:
-    ```bash
-    docker-compose up --build
-    ```
-    *Questo comando avvierà 5 istanze del nodo e 1 istanza della dashboard.*
+# 2. Build delle immagini e deploy dello stack
+./swarm-launch.sh
+```
 
-4.  Accesso alla Dashboard:
-    Aprire il browser all'indirizzo: `http://localhost:8080`
+Lo script `swarm-launch.sh` esegue:
+```bash
+docker compose build                    # Build immagini
+docker stack rm raymond                 # Rimuove stack precedente
+docker stack up -c compose.yaml raymond # Deploy nuovo stack
+docker service logs -f raymond_node     # Follow dei log
+```
 
-### Utilizzo
-1.  Dalla Dashboard, cliccare su un nodo qualsiasi nel grafo per forzare una **Richiesta di Mutua Esclusione**.
-2.  Osservare il cambio di colore del nodo (Giallo).
-3.  Osservare il movimento logico del Token (i nodi diventano rossi sequenzialmente).
-4.  Notare come le **frecce (archi) si invertono** al passaggio del Token, riconfigurando la radice dell'albero.
+### Configurazione Stack
 
----
+Il file `compose.yaml` definisce:
+
+| Servizio | Immagine | Repliche | Porte |
+|----------|----------|----------|-------|
+| broker | nats:alpine | 1 | 8222 (monitoring) |
+| dashboard | dashboard:latest | 1 | 8091 -> 8080 |
+| node | node-worker:latest | 10 | - |
+
+### Accesso alla Dashboard
+
+Una volta avviato lo stack:
+```
+http://localhost:8091
+```
+
+### Scaling dei nodi
+
+```bash
+# Aumenta il numero di nodi worker
+docker service scale raymond_node=20
+```
+
+### Monitoraggio
+
+```bash
+# Stato dei servizi
+docker service ls
+
+# Log di un servizio specifico
+docker service logs -f raymond_node
+docker service logs -f raymond_dashboard
+
+# NATS monitoring
+curl http://localhost:8222/varz
+```
+
+### Stop dello stack
+
+```bash
+docker stack rm raymond
+```
+
+## Struttura del Progetto
+
+```
+raymond-distributed-ai/
+├── node/                          # Modulo nodo distribuito
+│   ├── src/main/java/
+│   │   └── it/alesvale/node/
+│   │       ├── NodeApplication.java
+│   │       ├── broker/
+│   │       │   └── Broker.java
+│   │       ├── data/
+│   │       │   ├── Dto.java
+│   │       │   ├── NodeState.java
+│   │       │   ├── RaymondState.java
+│   │       │   └── StateMachine.java
+│   │       └── service/
+│   │           ├── LeaderElectionService.java
+│   │           ├── SpanningTreeService.java
+│   │           ├── RaymondService.java
+│   │           └── SocketManager.java
+│   ├── build.gradle
+│   └── Dockerfile
+│
+├── dashboard/                     # Modulo dashboard web
+│   ├── src/main/java/
+│   │   └── it/alesvale/dashboard/
+│   │       ├── DashboardApplication.java
+│   │       ├── backend/
+│   │       │   └── BrokerSubscriber.java
+│   │       ├── view/
+│   │       │   └── MainView.java
+│   │       └── component/
+│   │           ├── LogSidePanel.java
+│   │           └── StatusLegend.java
+│   ├── src/main/frontend/
+│   │   └── js/
+│   │       └── network-connector.js
+│   ├── build.gradle
+│   └── Dockerfile
+│
+├── compose.yaml                   # Docker Compose/Swarm config
+├── swarm-launch.sh               # Script di avvio
+└── README.md
+```
+
+## Riferimenti
+
+- Raymond, K. (1989). "A Tree-Based Algorithm for Distributed Mutual Exclusion"
+- NATS Documentation: https://docs.nats.io/
+- Vaadin Documentation: https://vaadin.com/docs
+- Vis.js Network: https://visjs.github.io/vis-network/docs/network/
