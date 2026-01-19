@@ -481,6 +481,60 @@ private synchronized void exitFromCriticalSection(){
 
 ---
 
+# Raymond: onRequestEvent
+
+Called when a node receives a REQUEST message from another node
+
+```java {all|3|5-6|8-9}
+private synchronized void onRequestEvent(RaymondEvent event){
+    // Event: The node receives a REQUEST message
+    nodeState.enqueueRequest(event.nodeId());
+
+    // Try to assign privilege (if we hold it)
+    ASSIGN_PRIVILEGE();
+
+    // Forward request toward holder (if needed)
+    MAKE_REQUEST();
+}
+```
+
+<div class="mt-4 text-gray-400 text-sm">
+
+1. Enqueues the requesting node's ID
+2. If holding privilege and not using, passes it along
+3. If not holding privilege, forwards request toward holder
+
+</div>
+
+---
+
+# Raymond: onPrivilegeEvent
+
+Called when a node receives the PRIVILEGE token
+
+```java {all|3|5-6|8-9}
+private synchronized void onPrivilegeEvent(){
+    // Event: The node receives the PRIVILEGE
+    nodeState.setHolder(nodeState.getId());
+
+    // Try to assign privilege (to self or next in queue)
+    ASSIGN_PRIVILEGE();
+
+    // Forward any pending requests
+    MAKE_REQUEST();
+}
+```
+
+<div class="mt-4 text-gray-400 text-sm">
+
+1. Becomes the new holder (points to self)
+2. Assigns privilege: enters CS if self is first in queue, otherwise passes privilege
+3. Forwards pending requests if not holding privilege anymore
+
+</div>
+
+---
+
 # Real-Time Dashboard: Network Graph
 
 <div class="flex justify-center">
