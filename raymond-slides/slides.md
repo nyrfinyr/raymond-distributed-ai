@@ -13,12 +13,6 @@ mdc: true
 
 Implementation of **Raymond's distributed mutual exclusion algorithm** with real-time visualization
 
-<div class="pt-12">
-  <span class="px-2 py-1 rounded cursor-pointer" flex="~ justify-center items-center gap-2">
-    Press Space to continue <div class="i-carbon:arrow-right inline-block"/>
-  </span>
-</div>
-
 <style>
 h1 {
   background-color: #2B90B6;
@@ -56,6 +50,7 @@ In distributed systems, ensuring that **only one process** accesses a **shared r
 - **Liveness**: Requests eventually satisfied
 - **Fairness**: FIFO order
 - **Efficiency**: Few messages
+- **Robustness**: Failures should be tolerated
 
 </div>
 </div>
@@ -123,7 +118,7 @@ flowchart TB
             N3["Node N"]
         end
 
-        NATS <-->|pub/sub| DASH
+        NATS -->|sub| DASH
         NATS <-->|pub/sub| N1
         NATS <-->|pub/sub| N2
         NATS <-->|pub/sub| N3
@@ -237,6 +232,7 @@ if (proposedLeaderId.compareTo(currentLeaderId) < 0) {
 </div>
 
 ---
+transition: slide-up
 level: 2
 ---
 
@@ -244,9 +240,26 @@ level: 2
 
 **Algorithm**: Incremental construction with **parent-child** adoption
 
-<div class="flex justify-center">
+<div class="grid grid-cols-2 gap-4">
 
-```mermaid {scale: 0.5}
+<div>
+
+### How it works
+
+1. **Leader** broadcasts its identity on `announce`
+2. **Orphans** listen and adopt the first announcer as parent
+3. Once adopted, orphans start broadcasting too
+4. Tree grows level by level, from leader to leaves
+5. Each `joined` resets a 20-second timer
+6. After 20s of silence → **stabilized**
+
+**NATS Topics**: `announce`, `joined`, `stabilized`
+
+</div>
+
+<div>
+
+```mermaid {scale: 0.45}
 sequenceDiagram
     participant L as Leader
     participant O1 as Orphan 1
@@ -266,15 +279,52 @@ sequenceDiagram
 
 </div>
 
-**NATS Topics**: `spanning-tree.announce`, `spanning-tree.joined`, `spanning-tree.stabilized`
+</div>
 
 ---
 level: 2
 ---
 
-# Phase 3: Raymond Mutual Exclusion
+# Phase 3: Raymond Algorithm
 
-**Algorithm**: Token-based on tree structure
+<div class="grid grid-cols-2 gap-6 mt-4">
+
+<div>
+
+### How it works
+
+1. Nodes are arranged in an **unrooted tree**
+2. A unique **PRIVILEGE token** grants CS access
+3. Each node has a **HOLDER** pointer toward the token
+4. **REQUEST** messages travel along HOLDER path
+5. **PRIVILEGE** returns along the request path
+6. HOLDER pointers are updated as token moves
+
+</div>
+
+<div>
+
+### Properties
+
+- Each node knows only its **neighbors**
+- Deadlock-free 
+- Starvation-free
+
+</div>
+
+</div>
+
+<div class="mt-6 text-center text-gray-400 text-sm">
+
+The tree structure ensures REQUEST messages always reach the privileged node
+
+</div>
+
+---
+level: 2
+---
+
+# Information held by each node
 
 <div class="grid grid-cols-2 gap-6 mt-2">
 
@@ -293,50 +343,11 @@ level: 2
 
 <div>
 
-### Procedures
+<img src="/spanning-tree.png" class="h-52" />
 
-```java {all|1-3|5-7}
-ASSIGN_PRIVILEGE():
-  // Pre: holder && !using
-  //      && !queue.isEmpty
-
-MAKE_REQUEST():
-  // Pre: !holder && !queue.isEmpty
-  //      && !asked
-```
+<p class="text-xs text-gray-500 text-right">Source: Raymond, K. (1989)</p>
 
 </div>
-
-</div>
-
----
-
-# Raymond: Message Flow
-
-<div class="flex justify-center">
-
-```mermaid {scale: 0.6}
-sequenceDiagram
-    participant A as Node A
-    participant B as Node B (Holder)
-    participant C as Node C
-
-    Note over B: Holds PRIVILEGE
-
-    A->>B: REQUEST
-    Note over B: Enqueue A
-
-    B->>A: PRIVILEGE
-    Note over A: Becomes HOLDER
-    Note over A: CRITICAL SECTION
-
-    C->>A: REQUEST
-    Note over A: Enqueue C
-    Note over A: Exit CS
-
-    A->>C: PRIVILEGE
-    Note over C: CRITICAL SECTION
-```
 
 </div>
 
@@ -425,7 +436,61 @@ private void loop() {
 
 ---
 
-# Raymond: askForCriticalSection
+# Raymond: Four Events
+
+There are **four events** which can alter the assignment of privilege and/or necessitate the sending of a REQUEST message
+
+<div class="grid grid-cols-2 gap-4 mt-4 text-sm">
+
+<div class="p-3 bg-blue-500 bg-opacity-10 rounded">
+
+**1. Node wishes to enter CS**
+```
+enqueue(REQUEST_Q, self)
+ASSIGN_PRIVILEGE()
+MAKE_REQUEST()
+```
+
+</div>
+
+<div class="p-3 bg-green-500 bg-opacity-10 rounded">
+
+**2. Node receives REQUEST from X**
+```
+enqueue(REQUEST_Q, X)
+ASSIGN_PRIVILEGE()
+MAKE_REQUEST()
+```
+
+</div>
+
+<div class="p-3 bg-purple-500 bg-opacity-10 rounded">
+
+**3. Node receives PRIVILEGE**
+```
+HOLDER := self
+ASSIGN_PRIVILEGE()
+MAKE_REQUEST()
+```
+
+</div>
+
+<div class="p-3 bg-orange-500 bg-opacity-10 rounded">
+
+**4. Node exits CS**
+```
+USING := false
+ASSIGN_PRIVILEGE()
+MAKE_REQUEST()
+```
+
+</div>
+
+</div>
+
+---
+
+# 1. Node wishes to enter CS
 
 Called when a node wants to enter the critical section
 
@@ -453,7 +518,7 @@ private synchronized void askForCriticalSection(){
 
 ---
 
-# Raymond: exitFromCriticalSection
+# 4. Node exits CS
 
 Called when a node exits the critical section
 
@@ -481,7 +546,7 @@ private synchronized void exitFromCriticalSection(){
 
 ---
 
-# Raymond: onRequestEvent
+# 2. Node receives REQUEST
 
 Called when a node receives a REQUEST message from another node
 
@@ -508,7 +573,7 @@ private synchronized void onRequestEvent(RaymondEvent event){
 
 ---
 
-# Raymond: onPrivilegeEvent
+# 3. Node receives PRIVILEGE
 
 Called when a node receives the PRIVILEGE token
 
